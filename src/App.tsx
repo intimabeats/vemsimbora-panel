@@ -21,6 +21,7 @@ import { AdminDashboard } from './pages/admin/Dashboard'
 import { UserManagement } from './pages/admin/UserManagement'
 import { ProjectManagement } from './pages/admin/ProjectManagement'
 import { TaskManagement } from './pages/admin/TaskManagement'
+import { SystemSettings } from './pages/admin/SystemSettings'
 
 // Manager Imports
 import { ManagerDashboard } from './pages/manager/Dashboard'
@@ -82,6 +83,14 @@ const App: React.FC = () => {
                 </PrivateRoute>
               } 
             />
+            <Route 
+              path="/admin/settings" 
+              element={
+                <PrivateRoute allowedRoles={['admin']}>
+                  <SystemSettings />
+                </PrivateRoute>
+              } 
+            />
 
             {/* Manager Routes */}
             <Route 
@@ -121,4 +130,5 @@ const App: React.FC = () => {
   )
 }
 
+// Corrigir exportação padrão
 export default Sentry.withProfiler(App)

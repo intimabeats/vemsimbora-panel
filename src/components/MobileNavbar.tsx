@@ -4,7 +4,8 @@ import {
   User, 
   Briefcase, 
   Award, 
-  Settings 
+  Settings,
+  CheckCircle
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -14,38 +15,78 @@ export const MobileNavbar: React.FC = () => {
   const { currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
 
-  const navItems = [
-    { 
-      icon: Home, 
-      label: 'Dashboard', 
-      route: `/${currentUser?.role}/dashboard`,
-      key: 'dashboard'
-    },
-    { 
-      icon: Briefcase, 
-      label: 'Projetos', 
-      route: `/${currentUser?.role}/projects`,
-      key: 'projects'
-    },
-    { 
-      icon: Award, 
-      label: 'Recompensas', 
-      route: `/${currentUser?.role}/rewards`,
-      key: 'rewards'
-    },
-    { 
-      icon: User, 
-      label: 'Perfil', 
-      route: '/profile',
-      key: 'profile'
-    },
-    { 
-      icon: Settings, 
-      label: 'Configurações', 
-      route: `/${currentUser?.role}/settings`,
-      key: 'settings'
+  // Definir itens de menu com base na role do usuário
+  const getNavItems = (role: string | undefined) => {
+    const commonItems = [
+      { 
+        icon: Home, 
+        label: 'Dashboard', 
+        route: `/${role}/dashboard`,
+        key: 'dashboard'
+      },
+      { 
+        icon: User, 
+        label: 'Perfil', 
+        route: '/profile',
+        key: 'profile'
+      }
+    ]
+
+    const roleSpecificItems = {
+      admin: [
+        { 
+          icon: Briefcase, 
+          label: 'Projetos', 
+          route: '/admin/projects',
+          key: 'projects'
+        },
+        { 
+          icon: CheckCircle, 
+          label: 'Tarefas', 
+          route: '/admin/tasks',
+          key: 'tasks'
+        },
+        { 
+          icon: Settings, 
+          label: 'Configurações', 
+          route: '/admin/settings',
+          key: 'settings'
+        }
+      ],
+      manager: [
+        { 
+          icon: Briefcase, 
+          label: 'Projetos', 
+          route: '/manager/projects',
+          key: 'projects'
+        },
+        { 
+          icon: CheckCircle, 
+          label: 'Tarefas', 
+          route: '/manager/tasks',
+          key: 'tasks'
+        }
+      ],
+      employee: [
+        { 
+          icon: Award, 
+          label: 'Recompensas', 
+          route: '/employee/rewards',
+          key: 'rewards'
+        },
+        { 
+          icon: CheckCircle, 
+          label: 'Tarefas', 
+          route: '/employee/tasks',
+          key: 'tasks'
+        }
+      ]
     }
-  ]
+
+    return [...commonItems, ...(roleSpecificItems[role] || [])]
+  }
+
+  const navItems = getNavItems(currentUser?.role)
 
   const handleNavigation = (route: string, key: string) => {
     setActiveTab(key)

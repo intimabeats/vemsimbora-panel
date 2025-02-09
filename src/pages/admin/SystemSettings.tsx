@@ -3,10 +3,8 @@ import { Layout } from '../../components/Layout'
 import { 
   Settings, 
   Coins, 
-  Lock, 
   Bell, 
   Shield, 
-  Sliders, 
   Save 
 } from 'lucide-react'
 
@@ -56,12 +54,12 @@ export const SystemSettings: React.FC = () => {
     <Layout role="admin">
       <div className="space-y-8">
         <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-          <Settings className="mr-4 text-blue-600" /> System Settings
+          <Settings className="mr-4 text-blue-600" /> Configurações do Sistema
         </h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <SettingsSection title="Coin Reward System" icon={Coins}>
-            <SettingRow label="Base Task Completion Reward">
+          <SettingsSection title="Sistema de Recompensas" icon={Coins}>
+            <SettingRow label="Base por Tarefa">
               <input 
                 type="number" 
                 value={coinSettings.taskCompletionBase}
@@ -72,7 +70,7 @@ export const SystemSettings: React.FC = () => {
                 className="w-24 px-2 py-1 border rounded-lg text-right"
               />
             </SettingRow>
-            <SettingRow label="Complexity Multiplier">
+            <SettingRow label="Multiplicador de Complexidade">
               <input 
                 type="number" 
                 step="0.1"
@@ -84,7 +82,7 @@ export const SystemSettings: React.FC = () => {
                 className="w-24 px-2 py-1 border rounded-lg text-right"
               />
             </SettingRow>
-            <SettingRow label="Monthly Bonus">
+            <SettingRow label="Bônus Mensal">
               <input 
                 type="number" 
                 value={coinSettings.monthlyBonus}
@@ -97,8 +95,8 @@ export const SystemSettings: React.FC = () => {
             </SettingRow>
           </SettingsSection>
 
-          <SettingsSection title="Notification Preferences" icon={Bell}>
-            <SettingRow label="Email Notifications">
+          <SettingsSection title="Notificações" icon={Bell}>
+            <SettingRow label="Notificações por Email">
               <label className="switch">
                 <input 
                   type="checkbox" 
@@ -111,7 +109,7 @@ export const SystemSettings: React.FC = () => {
                 <span className="slider round"></span>
               </label>
             </SettingRow>
-            <SettingRow label="Push Notifications">
+            <SettingRow label="Notificações Push">
               <label className="switch">
                 <input 
                   type="checkbox" 
@@ -124,7 +122,7 @@ export const SystemSettings: React.FC = () => {
                 <span className="slider round"></span>
               </label>
             </SettingRow>
-            <SettingRow label="Weekly Performance Reports">
+            <SettingRow label="Relatórios Semanais">
               <label className="switch">
                 <input 
                   type="checkbox" 
@@ -139,8 +137,8 @@ export const SystemSettings: React.FC = () => {
             </SettingRow>
           </SettingsSection>
 
-          <SettingsSection title="Security Settings" icon={Shield}>
-            <SettingRow label="Two-Factor Authentication">
+          <SettingsSection title="Segurança" icon={Shield}>
+            <SettingRow label="Autenticação de Dois Fatores">
               <label className="switch">
                 <input 
                   type="checkbox" 
@@ -153,7 +151,7 @@ export const SystemSettings: React.FC = () => {
                 <span className="slider round"></span>
               </label>
             </SettingRow>
-            <SettingRow label="Password Reset Frequency (Days)">
+            <SettingRow label="Redefinição de Senha (dias)">
               <input 
                 type="number" 
                 value={securitySettings.passwordResetFrequency}
@@ -165,19 +163,13 @@ export const SystemSettings: React.FC = () => {
               />
             </SettingRow>
           </SettingsSection>
-
-          <SettingsSection title="Advanced Configuration" icon={Sliders}>
-            <div className="text-gray-600">
-              Advanced system configurations will be added in future updates.
-            </div>
-          </SettingsSection>
         </div>
 
         <div className="flex justify-end">
           <button 
             className="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center hover:bg-blue-700 transition"
           >
-            <Save className="mr-2" /> Save Changes
+            <Save className="mr-2" /> Salvar Alterações
           </button>
         </div>
       </div>
