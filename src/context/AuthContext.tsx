@@ -10,7 +10,11 @@ import {
   SessionService, 
   TokenService 
 } from '../config/firebase'
-import { onAuthStateChanged, User } from 'firebase/auth'
+import { 
+  onAuthStateChanged, 
+  User, 
+  getIdToken 
+} from 'firebase/auth'
 
 // User roles type
 type UserRole = 'admin' | 'manager' | 'employee'
@@ -53,26 +57,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Tentar restaurar sessão ao montar o componente
-    const restoreSession = async () => {
-      const storedUser = await SessionService.restoreSession()
-      
-      if (storedUser) {
-        setCurrentUser(storedUser)
-      }
-      
-      setLoading(false)
-    }
-
-    // Listener de mudança de estado de autenticação
+    // Configurar listener de autenticação persistente
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          // Buscar dados do usuário
-          const userDoc = await AuthService.login(user.email!, '')
-          setCurrentUser(userDoc)
+          // Tentar restaurar dados do usuário do localStorage
+          const storedUser = localStorage.getItem('user')
+          
+          if (storedUser) {
+            const parsedUser = JSON.parse(storedUser)
+            
+            // Verificar validade do token
+            const token = await getIdToken(user, true)
+            
+            setCurrentUser({
+              ...user,
+              role: parsedUser.role,
+              coins: parsedUser.coins
+            })
+          } else {
+            // Se não houver dados no localStorage, buscar do Firestore
+            const userDoc = await AuthService.login(user.email!, '')
+            setCurrentUser({
+              ...user,
+              role: userDoc.role,
+              coins: userDoc.coins
+            })
+          }
         } catch (error) {
-          console.error('Falha ao buscar dados do usuário', error)
+          console.error('Erro ao restaurar sessão:', error)
           setCurrentUser(null)
         }
       } else {
@@ -80,26 +93,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       
       setLoading(false)
+    }, (error) => {
+      console.error('Erro no listener de autenticação:', error)
+      setCurrentUser(null)
+      setLoading(false)
     })
 
-    restoreSession()
+    // Configurar listener de expiração de token
+    const tokenListener = setInterval(async () => {
+      if (currentUser) {
+        try {
+          await getIdToken(currentUser, true)
+        } catch (error) {
+          console.error('Token expirado:', error)
+          await logout()
+        }
+      }
+    }, 30 * 60 * 1000) // Verificar a cada 30 minutos
 
-    // Limpar subscription
+    // Limpar listeners
     return () => {
       unsubscribe()
+      clearInterval(tokenListener)
     }
   }, [])
 
   // Métodos de autenticação
   const login = async (email: string, password: string) => {
-    const user = await AuthService.login(email, password)
-    setCurrentUser(user)
-    return user
+    try {
+      const user = await AuthService.login(email, password)
+      
+      // Salvar dados no localStorage
+      localStorage.setItem('user', JSON.stringify({
+        role: user.role,
+        coins: user.coins
+      }))
+
+      setCurrentUser(user)
+      return user
+    } catch (error) {
+      console.error('Erro de login:', error)
+      throw error
+    }
   }
 
   const logout = async () => {
-    await AuthService.logout()
-    setCurrentUser(null)
+    try {
+      await AuthService.logout()
+      localStorage.removeItem('user')
+      setCurrentUser(null)
+    } catch (error) {
+      console.error('Erro de logout:', error)
+      throw error
+    }
   }
 
   const refreshToken = async () => {

@@ -6,10 +6,8 @@ import {
   signOut,
   sendPasswordResetEmail,
   updateProfile,
-  onAuthStateChanged,
-  User,
-  getIdToken,
-  getIdTokenResult
+  setPersistence,
+  browserLocalPersistence
 } from 'firebase/auth'
 import { 
   getFirestore, 
@@ -18,12 +16,7 @@ import {
   getDoc, 
   updateDoc 
 } from 'firebase/firestore'
-import { 
-  getStorage, 
-  ref, 
-  uploadBytes, 
-  getDownloadURL 
-} from 'firebase/storage'
+import { getStorage } from 'firebase/storage'
 
 // Firebase configuration
 const firebaseConfig = {
@@ -42,91 +35,128 @@ const auth = getAuth(app)
 const db = getFirestore(app)
 const storage = getStorage(app)
 
-// Extended user interface
-interface ExtendedUser extends User {
-  role?: 'admin' | 'manager' | 'employee'
-  coins?: number
-}
+// Configurar persistência de sessão
+setPersistence(auth, browserLocalPersistence)
+  .catch((error) => {
+    console.error('Erro ao configurar persistência:', error)
+  })
 
-// Session management service
-export const SessionService = {
-  // Persistir sessão no localStorage
-  persistSession: async (user: ExtendedUser) => {
+// User roles type
+type UserRole = 'admin' | 'manager' | 'employee'
+
+// Authentication service
+export const AuthService = {
+  // Login user
+  login: async (email: string, password: string) => {
     try {
-      // Obter token de ID
-      const tokenResult = await getIdTokenResult(user)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
       
-      // Salvar informações no localStorage
-      localStorage.setItem('user', JSON.stringify({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        role: user.role,
-        coins: user.coins,
-        tokenExpirationTime: tokenResult.expirationTime
-      }))
-    } catch (error) {
-      console.error('Erro ao persistir sessão:', error)
-    }
-  },
-
-  // Recuperar sessão do localStorage
-  restoreSession: async (): Promise<ExtendedUser | null> => {
-    const storedUser = localStorage.getItem('user')
-    
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser)
+      // Buscar dados adicionais do usuário
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
       
-      // Verificar validade do token
-      if (parsedUser.tokenExpirationTime) {
-        const expirationTime = new Date(parsedUser.tokenExpirationTime).getTime()
-        const currentTime = new Date().getTime()
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
         
-        if (currentTime < expirationTime) {
-          return parsedUser
+        return {
+          ...user,
+          role: userData.role,
+          coins: userData.coins
         }
       }
-    }
-    
-    return null
-  },
-
-  // Limpar sessão
-  clearSession: () => {
-    localStorage.removeItem('user')
-  },
-
-  // Validar token
-  validateToken: async (user: User): Promise<boolean> => {
-    try {
-      const tokenResult = await getIdTokenResult(user)
-      const currentTime = new Date().getTime()
-      const expirationTime = new Date(tokenResult.expirationTime).getTime()
       
-      return currentTime < expirationTime
+      throw new Error('Dados do usuário não encontrados')
     } catch (error) {
-      console.error('Erro ao validar token:', error)
-      return false
+      console.error('Erro de login:', error)
+      throw error
+    }
+  },
+
+  // Register new user
+  register: async (
+    name: string, 
+    email: string, 
+    password: string, 
+    role: UserRole
+  ) => {
+    try {
+      // Criar usuário no Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
+
+      // Atualizar perfil
+      await updateProfile(user, { displayName: name })
+
+      // Criar documento no Firestore
+      const userData = {
+        id: user.uid,
+        name,
+        email,
+        role,
+        coins: 0,
+        status: 'active'
+      }
+
+      await setDoc(doc(db, 'users', user.uid), userData)
+
+      return {
+        ...user,
+        ...userData
+      }
+    } catch (error) {
+      console.error('Erro de registro:', error)
+      throw error
+    }
+  },
+
+  // Logout user
+  logout: async () => {
+    try {
+      await signOut(auth)
+    } catch (error) {
+      console.error('Erro de logout:', error)
+      throw error
+    }
+  },
+
+  // Password reset
+  resetPassword: async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email)
+    } catch (error) {
+      console.error('Erro de redefinição de senha:', error)
+      throw error
+    }
+  },
+
+  // Update user profile
+  updateProfile: async (userId: string, updates: any) => {
+    try {
+      const userRef = doc(db, 'users', userId)
+      await updateDoc(userRef, updates)
+    } catch (error) {
+      console.error('Erro ao atualizar perfil:', error)
+      throw error
     }
   }
 }
 
-// Token refresh service
+// Token service
 export const TokenService = {
   // Atualizar token manualmente
-  refreshToken: async (user: User): Promise<string> => {
+  refreshToken: async (user: any) => {
     try {
-      return await getIdToken(user, true)
+      return await user.getIdToken(true)
     } catch (error) {
       console.error('Erro ao atualizar token:', error)
       throw error
     }
   },
 
-  // Verificar permissões do token
-  checkTokenClaims: async (user: User) => {
+  // Verificar claims do token
+  checkTokenClaims: async (user: any) => {
     try {
-      const tokenResult = await getIdTokenResult(user)
+      const tokenResult = await user.getIdTokenResult()
       return {
         admin: tokenResult.claims.admin === true,
         manager: tokenResult.claims.manager === true,
@@ -143,49 +173,5 @@ export const TokenService = {
   }
 }
 
-// Authentication service
-export const AuthService = {
-  login: async (email: string, password: string) => {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const user = userCredential.user
-      
-      // Buscar dados adicionais do usuário
-      const userDoc = await getDoc(doc(db, 'users', user.uid))
-      
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        
-        // Persistir sessão
-        await SessionService.persistSession({
-          ...user,
-          role: userData.role,
-          coins: userData.coins
-        })
-        
-        return {
-          ...user,
-          role: userData.role,
-          coins: userData.coins
-        }
-      }
-      
-      throw new Error('Dados do usuário não encontrados')
-    } catch (error) {
-      console.error('Erro de login:', error)
-      throw error
-    }
-  },
-
-  logout: async () => {
-    try {
-      await signOut(auth)
-      SessionService.clearSession()
-    } catch (error) {
-      console.error('Erro de logout:', error)
-      throw error
-    }
-  }
-}
-
+// Exportar serviços e configurações
 export { auth, db, storage }
