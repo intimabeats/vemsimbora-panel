@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Layout } from '../../components/Layout'
 import { 
   Settings, 
   Coins, 
   Bell, 
   Shield, 
-  Save 
+  Save,
+  User
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 export const SystemSettings: React.FC = () => {
   const [coinSettings, setCoinSettings] = useState({
@@ -25,6 +27,8 @@ export const SystemSettings: React.FC = () => {
     twoFactorAuth: false,
     passwordResetFrequency: 90
   })
+
+  const navigate = useNavigate()
 
   const SettingsSection: React.FC<{
     title: string, 
@@ -53,9 +57,17 @@ export const SystemSettings: React.FC = () => {
   return (
     <Layout role="admin">
       <div className="space-y-8">
-        <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-          <Settings className="mr-4 text-blue-600" /> Configurações do Sistema
-        </h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+            <Settings className="mr-4 text-blue-600" /> Configurações
+          </h1>
+          <button
+            onClick={() => navigate('/profile')}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg flex items-center transition"
+          >
+            <User className="mr-2" /> Ver Perfil
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <SettingsSection title="Sistema de Recompensas" icon={Coins}>

@@ -1,11 +1,10 @@
 import React, { useState } from 'react'
 import { 
   Home, 
-  User, 
   Briefcase, 
-  Award, 
   Settings,
-  CheckCircle
+  CheckCircle,
+  Users as UsersIcon
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -23,17 +22,17 @@ export const MobileNavbar: React.FC = () => {
         label: 'Dashboard', 
         route: `/${role}/dashboard`,
         key: 'dashboard'
-      },
-      { 
-        icon: User, 
-        label: 'Perfil', 
-        route: '/profile',
-        key: 'profile'
       }
     ]
 
     const roleSpecificItems = {
       admin: [
+        {
+          icon: UsersIcon,
+          label: 'Usuários',
+          route: '/admin/user-management',
+          key: 'users'
+        },
         { 
           icon: Briefcase, 
           label: 'Projetos', 
@@ -65,20 +64,26 @@ export const MobileNavbar: React.FC = () => {
           label: 'Tarefas', 
           route: '/manager/tasks',
           key: 'tasks'
+        },
+        {
+          icon: Settings,
+          label: 'Configurações',
+          route: '/manager/settings',
+          key: 'settings'
         }
       ],
       employee: [
-        { 
-          icon: Award, 
-          label: 'Recompensas', 
-          route: '/employee/rewards',
-          key: 'rewards'
-        },
         { 
           icon: CheckCircle, 
           label: 'Tarefas', 
           route: '/employee/tasks',
           key: 'tasks'
+        },
+        {
+          icon: Settings,
+          label: 'Configurações',
+          route: '/employee/settings',
+          key: 'settings'
         }
       ]
     }

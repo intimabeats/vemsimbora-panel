@@ -4,7 +4,6 @@ import {
   Home, 
   Users, 
   Briefcase, 
-  Award, 
   Settings, 
   LogOut,
   CheckCircle 
@@ -22,12 +21,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
   const navigate = useNavigate()
 
   const commonLinks = [
-    { icon: Home, label: 'Dashboard', href: `/${role}/dashboard` },
-    { icon: Users, label: 'Perfil', href: '/profile' },
+    { icon: Home, label: 'Dashboard', href: `/${role}/dashboard` }
   ]
 
   const roleSpecificLinks = {
     admin: [
+      { icon: Users, label: 'Usuários', href: '/admin/user-management' },
       { icon: Briefcase, label: 'Projetos', href: '/admin/projects' },
       { icon: CheckCircle, label: 'Tarefas', href: '/admin/tasks' },
       { icon: Settings, label: 'Configurações', href: '/admin/settings' },
@@ -35,10 +34,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
     manager: [
       { icon: Briefcase, label: 'Projetos', href: '/manager/projects' },
       { icon: CheckCircle, label: 'Tarefas', href: '/manager/tasks' },
+      { icon: Settings, label: 'Configurações', href: '/manager/settings' }
     ],
     employee: [
-      { icon: Award, label: 'Recompensas', href: '/employee/rewards' },
-      { icon: CheckCircle, label: 'Minhas Tarefas', href: '/employee/tasks' },
+      { icon: CheckCircle, label: 'Tarefas', href: '/employee/tasks' },
+      { icon: Settings, label: 'Configurações', href: '/employee/settings' }
     ]
   }
 

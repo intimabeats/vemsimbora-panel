@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react'
-import { Layout } from '../components/Layout'
 import { 
   User, 
   Mail, 
   Lock, 
   Shield, 
   Save, 
-  Camera 
+  Camera,
+  X
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { AuthService } from '../config/firebase'
+import { useNavigate } from 'react-router-dom' // Importar useNavigate
 
 export const Profile: React.FC = () => {
   const { currentUser } = useAuth()
+  const navigate = useNavigate() // Usar useNavigate
   
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -91,10 +93,29 @@ export const Profile: React.FC = () => {
     }
   }
 
+    const handleClose = () => {
+        // Determinar a rota de retorno com base na role do usuário
+        const returnRoute = currentUser?.role === 'admin'
+          ? '/admin/settings'
+          : currentUser?.role === 'manager'
+          ? '/manager/settings'
+          : '/employee/settings'; // Rota padrão, ajuste conforme necessário
+
+        navigate(returnRoute);
+    };
+
   return (
-    <Layout role={currentUser?.role as any}>
+    <div className="p-8 bg-gray-50">
       <div className="space-y-8">
-        <h1 className="text-3xl font-bold text-gray-800">Meu Perfil</h1>
+      <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-800">Meu Perfil</h1>
+          <button
+            onClick={handleClose} // Usar a função handleClose
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X size={24} />
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Informações Pessoais */}
@@ -225,6 +246,6 @@ export const Profile: React.FC = () => {
           </div>
         </div>
       </div>
-    </Layout>
+    </div>
   )
 }

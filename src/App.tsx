@@ -40,16 +40,6 @@ const App: React.FC = () => {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Profile Route */}
-            <Route 
-              path="/profile" 
-              element={
-                <PrivateRoute>
-                  <Profile />
-                </PrivateRoute>
-              } 
-            />
-
             {/* Admin Routes */}
             <Route 
               path="/admin/dashboard" 
@@ -91,6 +81,14 @@ const App: React.FC = () => {
                 </PrivateRoute>
               } 
             />
+            <Route 
+                path="/profile" 
+                element={
+                  <PrivateRoute>
+                    <Profile />
+                  </PrivateRoute>
+                } 
+            />
 
             {/* Manager Routes */}
             <Route 
@@ -101,6 +99,14 @@ const App: React.FC = () => {
                 </PrivateRoute>
               } 
             />
+          <Route 
+              path="/manager/settings" 
+              element={
+                <PrivateRoute allowedRoles={['manager']}>
+                  <SystemSettings />
+                </PrivateRoute>
+              } 
+            />
 
             {/* Employee Routes */}
             <Route 
@@ -108,6 +114,14 @@ const App: React.FC = () => {
               element={
                 <PrivateRoute allowedRoles={['employee']}>
                   <EmployeeDashboard />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/employee/settings" 
+              element={
+                <PrivateRoute allowedRoles={['employee']}>
+                  <SystemSettings />
                 </PrivateRoute>
               } 
             />
