@@ -1,19 +1,20 @@
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+    getDoc,
+  query,
+  where,
+  orderBy,
   limit,
   startAfter
 } from 'firebase/firestore'
-import { 
-  getAuth, 
+import {
+  getAuth,
   createUserWithEmailAndPassword,
   updateProfile,
   deleteUser
@@ -29,11 +30,11 @@ export class UserManagementService {
     try {
       // Criar usuário no Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(
-        auth, 
-        userData.email, 
+        auth,
+        userData.email,
         'temporaryPassword123!' // Senha temporária
       )
-      
+
       const user = userCredential.user
 
       // Atualizar perfil
@@ -63,7 +64,7 @@ export class UserManagementService {
   async updateUser(userId: string, updates: Partial<UserSchema>) {
     try {
       const userRef = doc(this.db, 'users', userId)
-      
+
       await updateDoc(userRef, {
         ...updates,
         updatedAt: Date.now()
@@ -79,7 +80,7 @@ export class UserManagementService {
     try {
       // Excluir do Firestore
       await deleteDoc(doc(this.db, 'users', userId))
-      
+
       // Se o usuário estiver logado, pode precisar de reautenticação
       const currentUser = auth.currentUser
       if (currentUser && currentUser.uid === userId) {
@@ -92,12 +93,12 @@ export class UserManagementService {
   }
 
   // Buscar usuários com paginação e filtros
-  fetchUsers = async (options?: {
-    role?: UserSchema['role']
-    status?: UserSchema['status']
-    limit?: number
-    page?: number
-  }) => {
+    async fetchUsers(options?: {
+        role?: UserSchema['role'];
+        status?: UserSchema['status'];
+        limit?: number;
+        page?: number;
+    }): Promise<{ data: UserSchema[]; totalPages: number; totalUsers: number }> { // Added return type
     try {
       let q = query(collection(this.db, 'users'))
 
@@ -139,6 +140,26 @@ export class UserManagementService {
       throw error
     }
   }
+
+    async getUserById(userId: string): Promise<UserSchema> {
+        try {
+            const userRef = doc(this.db, 'users', userId);
+            const userSnap = await getDoc(userRef); // Use getDoc, not getDocs
+
+            if (userSnap.exists()) {
+                return {
+                    id: userSnap.id,
+                    ...userSnap.data()
+                } as UserSchema;
+            } else {
+                throw new Error('Usuário não encontrado');
+            }
+
+        } catch(error) {
+            console.error("Error fetching user by ID:", error);
+            throw error;
+        }
+    }
 
   // Enviar email de redefinição de senha
   async sendPasswordResetEmail(email: string) {

@@ -1,37 +1,43 @@
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
   limit
 } from 'firebase/firestore'
 import { auth } from '../config/firebase'
 import { TaskSchema } from '../types/firestore-schema'
+import { systemSettingsService } from './SystemSettingsService';
 
 export class TaskService {
   private db = getFirestore()
 
   // Criar nova tarefa
-  async createTask(taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'>) {
+    async createTask(taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'>) {
+    console.log("TaskService.createTask called with data:", taskData); // Log input
     try {
-      const taskRef = doc(collection(this.db, 'tasks'))
-      
+      const taskRef = doc(collection(this.db, 'tasks'));
+        const settings = await systemSettingsService.getSettings(); // Fetch settings
+        const coinsReward = Math.round(taskData.difficultyLevel * settings.taskCompletionBase * settings.complexityMultiplier);
+
       const newTask: TaskSchema = {
         id: taskRef.id,
         ...taskData,
         createdBy: auth.currentUser?.uid || '',
         status: 'pending',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        coinsReward // Use calculated value
       }
 
       await setDoc(taskRef, newTask)
+        console.log("Task created with ID:", taskRef.id); // Log success
       return newTask
     } catch (error) {
       console.error('Erro ao criar tarefa:', error)
@@ -42,11 +48,14 @@ export class TaskService {
   // Atualizar tarefa
   async updateTask(taskId: string, updates: Partial<TaskSchema>) {
     try {
-      const taskRef = doc(this.db, 'tasks', taskId)
-      
+      const taskRef = doc(this.db, 'tasks', taskId);
+        const settings = await systemSettingsService.getSettings(); // Fetch settings
+        const coinsReward = Math.round((updates.difficultyLevel || 1 )* settings.taskCompletionBase * settings.complexityMultiplier); // Recalculate
+
       await updateDoc(taskRef, {
         ...updates,
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        coinsReward
       })
     } catch (error) {
       console.error('Erro ao atualizar tarefa:', error)

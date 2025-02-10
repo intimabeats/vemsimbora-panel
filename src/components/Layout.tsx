@@ -115,7 +115,8 @@ import React, { ReactNode } from 'react'
         <div className="flex">
           {!hideNavigation && <Sidebar role={role} />}
           <main className={`${!hideNavigation ? 'md:ml-64' : ''} w-full p-4 md:p-8 bg-gray-50 min-h-screen pt-safe-top pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-8`}>
-            {isLoading ? <LoadingScreen /> : children}
+            {/* Only render LoadingScreen if isLoading is true AND hideNavigation is false */}
+            {isLoading && !hideNavigation ? <LoadingScreen /> : children}
           </main>
           {!hideNavigation && <MobileNavbar role={role} />}
         </div>

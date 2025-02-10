@@ -1,14 +1,15 @@
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy, 
+import {
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+    getDoc,
+  query,
+  where,
+  orderBy,
   limit
 } from 'firebase/firestore'
 import { auth } from '../config/firebase'
@@ -21,7 +22,7 @@ export class ProjectService {
   async createProject(projectData: Omit<ProjectSchema, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
       const projectRef = doc(collection(this.db, 'projects'))
-      
+
       const newProject: ProjectSchema = {
         id: projectRef.id,
         ...projectData,
@@ -42,7 +43,7 @@ export class ProjectService {
   async updateProject(projectId: string, updates: Partial<ProjectSchema>) {
     try {
       const projectRef = doc(this.db, 'projects', projectId)
-      
+
       await updateDoc(projectRef, {
         ...updates,
         updatedAt: Date.now()
@@ -108,25 +109,25 @@ export class ProjectService {
     }
   }
 
-  // Buscar projeto por ID
-  async getProjectById(projectId: string) {
-    try {
-      const projectRef = doc(this.db, 'projects', projectId)
-      const projectSnap = await getDoc(projectRef)
+    // Buscar projeto por ID
+    async getProjectById(projectId: string) {
+        try {
+            const projectRef = doc(this.db, 'projects', projectId);
+            const projectSnap = await getDoc(projectRef); // Use getDoc, not getDocs
 
-      if (projectSnap.exists()) {
-        return {
-          id: projectSnap.id,
-          ...projectSnap.data()
-        } as ProjectSchema
-      } else {
-        throw new Error('Projeto não encontrado')
-      }
-    } catch (error) {
-      console.error('Erro ao buscar projeto:', error)
-      throw error
+            if (projectSnap.exists()) {
+                return {
+                    id: projectSnap.id,
+                    ...projectSnap.data()
+                } as ProjectSchema;
+            } else {
+                throw new Error('Projeto não encontrado');
+            }
+        } catch (error) {
+            console.error('Erro ao buscar projeto por ID:', error); // More specific error message
+            throw error;
+        }
     }
-  }
 }
 
 export const projectService = new ProjectService()
