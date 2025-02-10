@@ -25,8 +25,12 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
   const [formData, setFormData] = useState({
     name: project.name,
     description: project.description,
-    startDate: new Date(project.startDate).toISOString().split('T')[0],
-    endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
+    startDate: project.startDate && project.startDate > 0 
+      ? new Date(project.startDate).toISOString().split('T')[0] 
+      : '',
+    endDate: project.endDate && project.endDate > 0 
+      ? new Date(project.endDate).toISOString().split('T')[0] 
+      : '',
     status: project.status,
     managers: project.managers
   })
@@ -60,8 +64,12 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
     setFormData({
       name: project.name,
       description: project.description,
-      startDate: new Date(project.startDate).toISOString().split('T')[0],
-      endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
+      startDate: project.startDate && project.startDate > 0 
+        ? new Date(project.startDate).toISOString().split('T')[0] 
+        : '',
+      endDate: project.endDate && project.endDate > 0 
+        ? new Date(project.endDate).toISOString().split('T')[0] 
+        : '',
       status: project.status,
       managers: project.managers
     })
@@ -88,8 +96,12 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
       const updateData: Partial<ProjectSchema> = {
         name: formData.name,
         description: formData.description,
-        startDate: new Date(formData.startDate).getTime(),
-        endDate: formData.endDate ? new Date(formData.endDate).getTime() : undefined,
+        startDate: formData.startDate 
+          ? new Date(formData.startDate).getTime() 
+          : undefined,
+        endDate: formData.endDate 
+          ? new Date(formData.endDate).getTime() 
+          : undefined,
         status: formData.status,
         managers: formData.managers
       }
