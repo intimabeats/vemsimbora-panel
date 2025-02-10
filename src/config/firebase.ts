@@ -1,20 +1,23 @@
 import { initializeApp } from 'firebase/app'
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
+import {
+  getAuth,
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
   updateProfile,
   setPersistence,
-  browserLocalPersistence
+  browserLocalPersistence,
+  reauthenticateWithCredential, // Import reauthenticateWithCredential
+  EmailAuthProvider // Import EmailAuthProvider
 } from 'firebase/auth'
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc 
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  collection
 } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
@@ -51,20 +54,20 @@ export const AuthService = {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
-      
+
       // Buscar dados adicionais do usuário
       const userDoc = await getDoc(doc(db, 'users', user.uid))
-      
+
       if (userDoc.exists()) {
         const userData = userDoc.data()
-        
+
         return {
           ...user,
           role: userData.role,
           coins: userData.coins
         }
       }
-      
+
       throw new Error('Dados do usuário não encontrados')
     } catch (error) {
       console.error('Erro de login:', error)
@@ -74,9 +77,9 @@ export const AuthService = {
 
   // Register new user
   register: async (
-    name: string, 
-    email: string, 
-    password: string, 
+    name: string,
+    email: string,
+    password: string,
     role: UserRole
   ) => {
     try {
@@ -134,9 +137,41 @@ export const AuthService = {
     try {
       const userRef = doc(db, 'users', userId)
       await updateDoc(userRef, updates)
+
+      // Update the user's profile in Firebase Authentication
+      if (auth.currentUser) {
+        const authUpdates: any = {};
+        if (updates.name) {
+          authUpdates.displayName = updates.name;
+        }
+        if (updates.photoURL) {
+          authUpdates.photoURL = updates.photoURL;
+        }
+        if (Object.keys(authUpdates).length > 0) {
+          await updateProfile(auth.currentUser, authUpdates);
+        }
+      }
+
+
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error)
       throw error
+    }
+  },
+
+    // Reauthenticate user  -- ADDED THIS METHOD
+  reauthenticate: async (email: string, password: string) => {
+    try {
+      const user = auth.currentUser
+      if (!user) {
+        throw new Error('Nenhum usuário autenticado')
+      }
+      const credential = EmailAuthProvider.credential(email, password)
+      await reauthenticateWithCredential(user, credential)
+      return true // Return true on success
+    } catch (error) {
+      console.error('Erro de reautenticação:', error)
+      return false // Return false on failure
     }
   }
 }
