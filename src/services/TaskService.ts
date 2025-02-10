@@ -6,6 +6,7 @@ import {
   updateDoc,
   deleteDoc,
   getDocs,
+  getDoc,
   query,
   where,
   orderBy,
@@ -13,18 +14,24 @@ import {
 } from 'firebase/firestore'
 import { auth } from '../config/firebase'
 import { TaskSchema } from '../types/firestore-schema'
-import { systemSettingsService } from './SystemSettingsService';
+import { systemSettingsService } from './SystemSettingsService'
+import { storage } from '../config/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 export class TaskService {
   private db = getFirestore()
 
   // Criar nova tarefa
-    async createTask(taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'>) {
-    console.log("TaskService.createTask called with data:", taskData); // Log input
+  async createTask(taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'>) {
     try {
-      const taskRef = doc(collection(this.db, 'tasks'));
-        const settings = await systemSettingsService.getSettings(); // Fetch settings
-        const coinsReward = Math.round(taskData.difficultyLevel * settings.taskCompletionBase * settings.complexityMultiplier);
+      const taskRef = doc(collection(this.db, 'tasks'))
+      const settings = await systemSettingsService.getSettings()
+      
+      const coinsReward = Math.round(
+        taskData.difficultyLevel * 
+        settings.taskCompletionBase * 
+        settings.complexityMultiplier
+      )
 
       const newTask: TaskSchema = {
         id: taskRef.id,
@@ -33,11 +40,13 @@ export class TaskService {
         status: 'pending',
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        coinsReward // Use calculated value
+        coinsReward,
+        subtasks: taskData.subtasks || [],
+        comments: taskData.comments || [],
+        attachments: taskData.attachments || []
       }
 
       await setDoc(taskRef, newTask)
-        console.log("Task created with ID:", taskRef.id); // Log success
       return newTask
     } catch (error) {
       console.error('Erro ao criar tarefa:', error)
@@ -48,15 +57,29 @@ export class TaskService {
   // Atualizar tarefa
   async updateTask(taskId: string, updates: Partial<TaskSchema>) {
     try {
-      const taskRef = doc(this.db, 'tasks', taskId);
-        const settings = await systemSettingsService.getSettings(); // Fetch settings
-        const coinsReward = Math.round((updates.difficultyLevel || 1 )* settings.taskCompletionBase * settings.complexityMultiplier); // Recalculate
+      const taskRef = doc(this.db, 'tasks', taskId)
+      const settings = await systemSettingsService.getSettings()
+      
+      // Recalculate coins reward if difficulty changes
+      const coinsReward = updates.difficultyLevel
+        ? Math.round(
+            updates.difficultyLevel * 
+            settings.taskCompletionBase * 
+            settings.complexityMultiplier
+          )
+        : undefined
 
-      await updateDoc(taskRef, {
+      const updateData = {
         ...updates,
-        updatedAt: Date.now(),
-        coinsReward
-      })
+        ...(coinsReward ? { coinsReward } : {}),
+        updatedAt: Date.now()
+      }
+
+      await updateDoc(taskRef, updateData)
+      
+      // Fetch updated task
+      const updatedDoc = await getDoc(taskRef)
+      return { id: updatedDoc.id, ...updatedDoc.data() } as TaskSchema
     } catch (error) {
       console.error('Erro ao atualizar tarefa:', error)
       throw error
@@ -75,13 +98,13 @@ export class TaskService {
   }
 
   // Buscar tarefas com paginação e filtros
-  fetchTasks = async (options?: {
+  async fetchTasks(options?: {
     projectId?: string
     status?: TaskSchema['status']
     assignedTo?: string
     limit?: number
     page?: number
-  }) => {
+  }) {
     try {
       let q = query(collection(this.db, 'tasks'))
 
@@ -129,7 +152,7 @@ export class TaskService {
   }
 
   // Buscar tarefa por ID
-  async getTaskById(taskId: string) {
+  async getTaskById(taskId: string): Promise<TaskSchema> {
     try {
       const taskRef = doc(this.db, 'tasks', taskId)
       const taskSnap = await getDoc(taskRef)
@@ -144,6 +167,82 @@ export class TaskService {
       }
     } catch (error) {
       console.error('Erro ao buscar tarefa:', error)
+      throw error
+    }
+  }
+
+  // Upload de anexos para tarefa
+  async uploadTaskAttachment(taskId: string, file: File): Promise<string> {
+    try {
+      const storageRef = ref(storage, `tasks/${taskId}/attachments/${file.name}`)
+      await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(storageRef)
+
+      // Atualizar tarefa com novo anexo
+      const taskRef = doc(this.db, 'tasks', taskId)
+      await updateDoc(taskRef, {
+        attachments: [...(await this.getTaskAttachments(taskId)), downloadURL]
+      })
+
+      return downloadURL
+    } catch (error) {
+      console.error('Erro ao fazer upload de anexo:', error)
+      throw error
+    }
+  }
+
+  // Buscar anexos de uma tarefa
+  async getTaskAttachments(taskId: string): Promise<string[]> {
+    try {
+      const taskRef = doc(this.db, 'tasks', taskId)
+      const taskSnap = await getDoc(taskRef)
+
+      if (taskSnap.exists()) {
+        const taskData = taskSnap.data() as TaskSchema
+        return taskData.attachments || []
+      }
+
+      return []
+    } catch (error) {
+      console.error('Erro ao buscar anexos:', error)
+      throw error
+    }
+  }
+
+  // Adicionar comentário à tarefa
+  async addTaskComment(
+    taskId: string, 
+    comment: {
+      userId: string, 
+      text: string, 
+      attachments?: string[]
+    }
+  ) {
+    try {
+      const taskRef = doc(this.db, 'tasks', taskId)
+      const taskDoc = await getDoc(taskRef)
+      
+      if (!taskDoc.exists()) {
+        throw new Error('Tarefa não encontrada')
+      }
+
+      const taskData = taskDoc.data() as TaskSchema
+      const newComment = {
+        id: Date.now().toString(),
+        userId: comment.userId,
+        text: comment.text,
+        createdAt: Date.now(),
+        attachments: comment.attachments || []
+      }
+
+      await updateDoc(taskRef, {
+        comments: [...(taskData.comments || []), newComment],
+        updatedAt: Date.now()
+      })
+
+      return newComment
+    } catch (error) {
+      console.error('Erro ao adicionar comentário:', error)
       throw error
     }
   }

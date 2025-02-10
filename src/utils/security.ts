@@ -1,41 +1,28 @@
 import { 
   getAuth, 
   reauthenticateWithCredential, 
-  EmailAuthProvider 
+  EmailAuthProvider,
+  multiFactor,
+  PhoneAuthProvider,
+  PhoneMultiFactorGenerator
 } from 'firebase/auth'
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  updateDoc,
+  getDoc
+} from 'firebase/firestore'
+
+// Tipos de log de segurança
+type SecurityLogType = 
+  | 'login_attempt'
+  | 'password_change'
+  | 'profile_update'
+  | 'suspicious_activity'
+  | 'two_factor_setup'
 
 export const SecurityUtils = {
-  // Validar força da senha
-  validatePasswordStrength: (password: string): boolean => {
-    // Requisitos:
-    // - Mínimo 8 caracteres
-    // - Pelo menos uma letra maiúscula
-    // - Pelo menos uma letra minúscula
-    // - Pelo menos um número
-    // - Pelo menos um caractere especial
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
-    return passwordRegex.test(password)
-  },
-
-  // Reautenticar usuário antes de ações sensíveis
-  reauthenticateUser: async (email: string, password: string) => {
-    const auth = getAuth()
-    const user = auth.currentUser
-
-    if (!user || !user.email) {
-      throw new Error('Usuário não autenticado')
-    }
-
-    try {
-      const credential = EmailAuthProvider.credential(email, password)
-      await reauthenticateWithCredential(user, credential)
-      return true
-    } catch (error) {
-      console.error('Erro de reautenticação:', error)
-      throw error
-    }
-  },
-
   // Gerar código de verificação
   generateVerificationCode: (length: number = 6): string => {
     return Array.from(
@@ -60,6 +47,76 @@ export const SecurityUtils = {
     )
   },
 
+  // Reautenticar usuário antes de ações sensíveis
+  reauthenticateUser: async (email: string, password: string) => {
+    const auth = getAuth()
+    const user = auth.currentUser
+
+    if (!user || !user.email) {
+      throw new Error('Usuário não autenticado')
+    }
+
+    try {
+      const credential = EmailAuthProvider.credential(email, password)
+      await reauthenticateWithCredential(user, credential)
+      return true
+    } catch (error) {
+      console.error('Erro de reautenticação:', error)
+      throw error
+    }
+  },
+
+  // Configurar autenticação de dois fatores
+  setupTwoFactorAuth: async (phoneNumber: string) => {
+    const auth = getAuth()
+    const user = auth.currentUser
+
+    if (!user) {
+      throw new Error('Usuário não autenticado')
+    }
+
+    try {
+      const multiFactorUser = multiFactor(user)
+      const phoneAuthProvider = new PhoneAuthProvider(auth)
+
+      // Iniciar registro de telefone
+      const session = await multiFactorUser.getSession()
+      const phoneVerificationInfo = await phoneAuthProvider.verifyPhoneNumber({
+        phoneNumber,
+        multiFactorSession: session
+      })
+
+      return phoneVerificationInfo
+    } catch (error) {
+      console.error('Erro ao configurar 2FA:', error)
+      throw error
+    }
+  },
+
+  // Registrar log de segurança
+  logSecurityEvent: async (
+    userId: string, 
+    eventType: SecurityLogType, 
+    details: Record<string, any>
+  ) => {
+    const db = getFirestore()
+
+    try {
+      const logRef = doc(
+        collection(db, 'users', userId, 'security_logs')
+      )
+
+      await setDoc(logRef, {
+        type: eventType,
+        timestamp: Date.now(),
+        ...details
+      })
+    } catch (error) {
+      console.error('Erro ao registrar log de segurança:', error)
+      throw error
+    }
+  },
+
   // Máscarar informações sensíveis
   maskSensitiveData: {
     email: (email: string) => {
@@ -71,19 +128,23 @@ export const SecurityUtils = {
     cpf: (cpf: string) => {
       if (!cpf) return ''
       return `***${cpf.slice(-4)}`
-    }
-  }
-}
+    },
 
-// Middleware de segurança para ações críticas
-export const SecurityMiddleware = {
-  async protectAction<T>(
+    phoneNumber: (phone: string) => {
+      if (!phone) return ''
+      return `+55 (${phone.slice(0, 2)}) ****-${phone.slice(-4)}`
+    }
+  },
+
+  // Middleware de segurança para ações críticas
+  protectAction: async <T>(
     action: () => Promise<T>, 
     options?: {
       requireReauth?: boolean
       requiredRole?: 'admin' | 'manager' | 'employee'
+      twoFactorRequired?: boolean
     }
-  ): Promise<T> {
+  ): Promise<T> => {
     const auth = getAuth()
     const user = auth.currentUser
 
@@ -94,8 +155,17 @@ export const SecurityMiddleware = {
 
     // Verificar role, se necessário
     if (options?.requiredRole) {
-      // Lógica de verificação de role
-      // Pode ser implementada com custom claims ou verificação no Firestore
+      const db = getFirestore()
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
+      
+      if (!userDoc.exists()) {
+        throw new Error('Dados do usuário não encontrados')
+      }
+
+      const userData = userDoc.data()
+      if (userData.role !== options.requiredRole) {
+        throw new Error('Permissão insuficiente')
+      }
     }
 
     // Reautenticação, se necessário
@@ -104,7 +174,37 @@ export const SecurityMiddleware = {
       // Pode solicitar senha novamente
     }
 
+    // Verificação de dois fatores, se necessário
+    if (options?.twoFactorRequired) {
+      const multiFactorUser = multiFactor(user)
+      const enrolledFactors = multiFactorUser.enrolledFactors
+
+      if (!enrolledFactors || enrolledFactors.length === 0) {
+        throw new Error('Autenticação de dois fatores não configurada')
+      }
+    }
+
     // Executar ação protegida
     return action()
+  }
+}
+
+// Gerador de tokens de segurança
+export const TokenGenerator = {
+  generateSecureToken: (length: number = 32): string => {
+    const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    return Array.from(
+      crypto.getRandomValues(new Uint32Array(length))
+    ).map((x) => charset[x % charset.length]).join('')
+  },
+
+  generateTemporaryAccessToken: (
+    userId: string, 
+    expirationMinutes: number = 30
+  ): { token: string, expiresAt: number } => {
+    const token = TokenGenerator.generateSecureToken()
+    const expiresAt = Date.now() + (expirationMinutes * 60 * 1000)
+
+    return { token, expiresAt }
   }
 }

@@ -6,11 +6,12 @@ import {
   updateDoc,
   deleteDoc,
   getDocs,
-    getDoc,
+  getDoc,
   query,
   where,
   orderBy,
-  limit
+  limit,
+  startAfter
 } from 'firebase/firestore'
 import { auth } from '../config/firebase'
 import { ProjectSchema } from '../types/firestore-schema'
@@ -28,7 +29,14 @@ export class ProjectService {
         ...projectData,
         createdBy: auth.currentUser?.uid || '',
         createdAt: Date.now(),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        commentTabs: [
+          {
+            id: 'general',
+            name: 'Geral',
+            comments: []
+          }
+        ]
       }
 
       await setDoc(projectRef, newProject)
@@ -38,7 +46,56 @@ export class ProjectService {
       throw error
     }
   }
+async addProjectMessage(
+  projectId: string, 
+  message: {
+    id: string
+    userId: string
+    userName: string
+    content: string
+    timestamp: number
+    attachments?: any[]
+  }
+) {
+  try {
+    const projectRef = doc(this.db, 'projects', projectId)
+    const projectDoc = await getDoc(projectRef)
+    
+    if (!projectDoc.exists()) {
+      throw new Error('Projeto não encontrado')
+    }
 
+    const projectData = projectDoc.data()
+    const messages = projectData.messages || []
+
+    await updateDoc(projectRef, {
+      messages: [...messages, message],
+      updatedAt: Date.now()
+    })
+
+    return message
+  } catch (error) {
+    console.error('Erro ao adicionar mensagem:', error)
+    throw error
+  }
+}
+
+	async getProjectMessages(projectId: string): Promise<any[]> {
+  try {
+    const projectRef = doc(this.db, 'projects', projectId)
+    const projectDoc = await getDoc(projectRef)
+    
+    if (!projectDoc.exists()) {
+      throw new Error('Projeto não encontrado')
+    }
+
+    const projectData = projectDoc.data()
+    return projectData.messages || []
+  } catch (error) {
+    console.error('Erro ao buscar mensagens:', error)
+    throw error
+  }
+}
   // Atualizar projeto
   async updateProject(projectId: string, updates: Partial<ProjectSchema>) {
     try {
@@ -48,6 +105,10 @@ export class ProjectService {
         ...updates,
         updatedAt: Date.now()
       })
+
+      // Fetch and return updated project
+      const updatedDoc = await getDoc(projectRef)
+      return { id: updatedDoc.id, ...updatedDoc.data() } as ProjectSchema
     } catch (error) {
       console.error('Erro ao atualizar projeto:', error)
       throw error
@@ -109,25 +170,70 @@ export class ProjectService {
     }
   }
 
-    // Buscar projeto por ID
-    async getProjectById(projectId: string) {
-        try {
-            const projectRef = doc(this.db, 'projects', projectId);
-            const projectSnap = await getDoc(projectRef); // Use getDoc, not getDocs
+  // Buscar projeto por ID
+  async getProjectById(projectId: string): Promise<ProjectSchema> {
+    try {
+      const projectRef = doc(this.db, 'projects', projectId)
+      const projectSnap = await getDoc(projectRef)
 
-            if (projectSnap.exists()) {
-                return {
-                    id: projectSnap.id,
-                    ...projectSnap.data()
-                } as ProjectSchema;
-            } else {
-                throw new Error('Projeto não encontrado');
-            }
-        } catch (error) {
-            console.error('Erro ao buscar projeto por ID:', error); // More specific error message
-            throw error;
-        }
+      if (projectSnap.exists()) {
+        return {
+          id: projectSnap.id,
+          ...projectSnap.data()
+        } as ProjectSchema
+      } else {
+        throw new Error('Projeto não encontrado')
+      }
+    } catch (error) {
+      console.error('Erro ao buscar projeto por ID:', error)
+      throw error
     }
+  }
+
+  // Adicionar comentário ao projeto
+  async addProjectComment(
+    projectId: string, 
+    tabId: string, 
+    comment: {
+      userId: string, 
+      userName: string, 
+      content: string, 
+      timestamp: number,
+      attachments?: any[]
+    }
+  ) {
+    try {
+      const projectRef = doc(this.db, 'projects', projectId)
+      const projectDoc = await getDoc(projectRef)
+      
+      if (!projectDoc.exists()) {
+        throw new Error('Projeto não encontrado')
+      }
+
+      const projectData = projectDoc.data() as ProjectSchema
+      const commentTabs = projectData.commentTabs || []
+
+      const updatedTabs = commentTabs.map(tab => {
+        if (tab.id === tabId) {
+          return {
+            ...tab,
+            comments: [...(tab.comments || []), comment]
+          }
+        }
+        return tab
+      })
+
+      await updateDoc(projectRef, {
+        commentTabs: updatedTabs,
+        updatedAt: Date.now()
+      })
+
+      return updatedTabs
+    } catch (error) {
+      console.error('Erro ao adicionar comentário:', error)
+      throw error
+    }
+  }
 }
 
 export const projectService = new ProjectService()

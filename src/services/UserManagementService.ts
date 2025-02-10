@@ -6,7 +6,7 @@ import {
   updateDoc,
   deleteDoc,
   getDocs,
-    getDoc,
+  getDoc,
   query,
   where,
   orderBy,
@@ -17,22 +17,28 @@ import {
   getAuth,
   createUserWithEmailAndPassword,
   updateProfile,
-  deleteUser
+  deleteUser,
+  sendPasswordResetEmail
 } from 'firebase/auth'
 import { UserSchema } from '../types/firestore-schema'
-import { auth } from '../config/firebase'
+import { auth, storage } from '../config/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 export class UserManagementService {
   private db = getFirestore()
+  private auth = getAuth()
 
   // Criar novo usuário
-  async createUser(userData: Omit<UserSchema, 'id' | 'createdAt' | 'updatedAt'>) {
+  async createUser(
+    userData: Omit<UserSchema, 'id' | 'createdAt' | 'updatedAt' | 'coins'>,
+    password: string
+  ): Promise<UserSchema> {
     try {
       // Criar usuário no Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(
-        auth,
+        this.auth,
         userData.email,
-        'temporaryPassword123!' // Senha temporária
+        password
       )
 
       const user = userCredential.user
@@ -61,14 +67,31 @@ export class UserManagementService {
   }
 
   // Atualizar usuário
-  async updateUser(userId: string, updates: Partial<UserSchema>) {
+  async updateUser(
+    userId: string, 
+    updates: Partial<UserSchema>,
+    profileImage?: File
+  ): Promise<UserSchema> {
     try {
       const userRef = doc(this.db, 'users', userId)
 
+      // Upload de imagem de perfil, se fornecida
+      if (profileImage) {
+        const storageRef = ref(storage, `users/${userId}/profile_image`)
+        await uploadBytes(storageRef, profileImage)
+        const photoURL = await getDownloadURL(storageRef)
+        updates.profileImage = photoURL
+      }
+
+      // Atualizar usuário no Firestore
       await updateDoc(userRef, {
         ...updates,
         updatedAt: Date.now()
       })
+
+      // Buscar usuário atualizado
+      const updatedDoc = await getDoc(userRef)
+      return { id: updatedDoc.id, ...updatedDoc.data() } as UserSchema
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error)
       throw error
@@ -82,7 +105,7 @@ export class UserManagementService {
       await deleteDoc(doc(this.db, 'users', userId))
 
       // Se o usuário estiver logado, pode precisar de reautenticação
-      const currentUser = auth.currentUser
+      const currentUser = this.auth.currentUser
       if (currentUser && currentUser.uid === userId) {
         await deleteUser(currentUser)
       }
@@ -93,12 +116,17 @@ export class UserManagementService {
   }
 
   // Buscar usuários com paginação e filtros
-    async fetchUsers(options?: {
-        role?: UserSchema['role'];
-        status?: UserSchema['status'];
-        limit?: number;
-        page?: number;
-    }): Promise<{ data: UserSchema[]; totalPages: number; totalUsers: number }> { // Added return type
+  async fetchUsers(options?: {
+    role?: UserSchema['role']
+    status?: UserSchema['status']
+    limit?: number
+    page?: number
+    searchTerm?: string
+  }): Promise<{ 
+    data: UserSchema[]; 
+    totalPages: number; 
+    totalUsers: number 
+  }> {
     try {
       let q = query(collection(this.db, 'users'))
 
@@ -109,6 +137,16 @@ export class UserManagementService {
 
       if (options?.status) {
         q = query(q, where('status', '==', options.status))
+      }
+
+      // Filtro de busca
+      if (options?.searchTerm) {
+        const searchTerm = options.searchTerm.toLowerCase()
+        q = query(
+          q, 
+          where('name', '>=', searchTerm),
+          where('name', '<=', searchTerm + '\uf8ff')
+        )
       }
 
       // Ordenação
@@ -141,36 +179,83 @@ export class UserManagementService {
     }
   }
 
-    async getUserById(userId: string): Promise<UserSchema> {
-        try {
-            const userRef = doc(this.db, 'users', userId);
-            const userSnap = await getDoc(userRef); // Use getDoc, not getDocs
+  // Buscar usuário por ID
+  async getUserById(userId: string): Promise<UserSchema> {
+    try {
+      const userRef = doc(this.db, 'users', userId)
+      const userSnap = await getDoc(userRef)
 
-            if (userSnap.exists()) {
-                return {
-                    id: userSnap.id,
-                    ...userSnap.data()
-                } as UserSchema;
-            } else {
-                throw new Error('Usuário não encontrado');
-            }
-
-        } catch(error) {
-            console.error("Error fetching user by ID:", error);
-            throw error;
-        }
+      if (userSnap.exists()) {
+        return {
+          id: userSnap.id,
+          ...userSnap.data()
+        } as UserSchema
+      } else {
+        throw new Error('Usuário não encontrado')
+      }
+    } catch (error) {
+      console.error('Erro ao buscar usuário por ID:', error)
+      throw error
     }
+  }
 
   // Enviar email de redefinição de senha
   async sendPasswordResetEmail(email: string) {
     try {
-      // Implementação de envio de email de redefinição
+      await sendPasswordResetEmail(this.auth, email)
     } catch (error) {
       console.error('Erro ao enviar email de redefinição:', error)
       throw error
     }
   }
+
+  // Gerenciar moedas do usuário
+  async updateUserCoins(
+    userId: string, 
+    coinsToAdd: number
+  ): Promise<number> {
+    try {
+      const userRef = doc(this.db, 'users', userId)
+      const userDoc = await getDoc(userRef)
+
+      if (!userDoc.exists()) {
+        throw new Error('Usuário não encontrado')
+      }
+
+      const currentCoins = userDoc.data().coins || 0
+      const newCoinBalance = currentCoins + coinsToAdd
+
+      await updateDoc(userRef, {
+        coins: newCoinBalance,
+        updatedAt: Date.now()
+      })
+
+      return newCoinBalance
+    } catch (error) {
+      console.error('Erro ao atualizar moedas:', error)
+      throw error
+    }
+  }
+
+  // Registrar histórico de transações de moedas
+  async logCoinTransaction(
+    userId: string, 
+    amount: number, 
+    description: string
+  ) {
+    try {
+      const transactionRef = doc(collection(this.db, 'users', userId, 'coin_transactions'))
+      
+      await setDoc(transactionRef, {
+        amount,
+        description,
+        timestamp: Date.now()
+      })
+    } catch (error) {
+      console.error('Erro ao registrar transação de moedas:', error)
+      throw error
+    }
+  }
 }
 
-// Instância do serviço
 export const userManagementService = new UserManagementService()

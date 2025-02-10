@@ -1,60 +1,64 @@
 import { 
   getFirestore, 
   collection, 
-  addDoc, 
+  doc,
+  addDoc,
   query, 
   where, 
   orderBy, 
   limit,
   updateDoc,
-  doc,
-  deleteDoc
+  deleteDoc,
+  getDocs,
+  getDoc
 } from 'firebase/firestore'
+import { NotificationSchema } from '../types/firestore-schema'
 import { auth } from '../config/firebase'
-import { Notification, NotificationType } from '../types/notification'
 
 export class NotificationService {
   private db = getFirestore()
 
-  // Criar nova notificação
-  static async createNotification(
+  // Criar nova notificação para um usuário específico
+  async createNotification(
     userId: string, 
-    notification: Omit<Notification, 'id' | 'timestamp' | 'read'>
-  ) {
-    const db = getFirestore()
-    
+    notification: Omit<NotificationSchema, 'id' | 'read' | 'timestamp'>
+  ): Promise<NotificationSchema> {
     try {
-      const notificationData = {
+      const notificationData: NotificationSchema = {
+        id: '', // Será preenchido pelo Firestore
+        userId,
         ...notification,
-        timestamp: Date.now(),
-        read: false
+        read: false,
+        timestamp: Date.now()
       }
 
       const docRef = await addDoc(
-        collection(db, 'users', userId, 'notifications'), 
+        collection(this.db, 'users', userId, 'notifications'), 
         notificationData
       )
 
-      return { ...notificationData, id: docRef.id }
+      return {
+        ...notificationData,
+        id: docRef.id
+      }
     } catch (error) {
       console.error('Erro ao criar notificação:', error)
       throw error
     }
   }
 
-  // Buscar notificações do usuário
-  static async getUserNotifications(
+  // Buscar notificações de um usuário
+  async getUserNotifications(
     userId: string, 
     options?: { 
       limit?: number, 
-      unreadOnly?: boolean 
+      unreadOnly?: boolean,
+      type?: NotificationSchema['type']
     }
-  ) {
-    const db = getFirestore()
-    
+  ): Promise<NotificationSchema[]> {
     try {
       let notificationsQuery = query(
-        collection(db, 'users', userId, 'notifications'),
+        collection(this.db, 'users', userId, 'notifications'),
         orderBy('timestamp', 'desc')
       )
 
@@ -66,6 +70,14 @@ export class NotificationService {
         )
       }
 
+      // Filtrar por tipo
+      if (options?.type) {
+        notificationsQuery = query(
+          notificationsQuery,
+          where('type', '==', options.type)
+        )
+      }
+
       // Limitar número de notificações
       if (options?.limit) {
         notificationsQuery = query(
@@ -74,12 +86,11 @@ export class NotificationService {
         )
       }
 
-      // Implementação real seria com onSnapshot para tempo real
       const snapshot = await getDocs(notificationsQuery)
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      } as Notification))
+      } as NotificationSchema))
     } catch (error) {
       console.error('Erro ao buscar notificações:', error)
       throw error
@@ -87,15 +98,13 @@ export class NotificationService {
   }
 
   // Marcar notificação como lida
-  static async markNotificationAsRead(
+  async markNotificationAsRead(
     userId: string, 
     notificationId: string
-  ) {
-    const db = getFirestore()
-    
+  ): Promise<void> {
     try {
       const notificationRef = doc(
-        db, 
+        this.db, 
         'users', 
         userId, 
         'notifications', 
@@ -109,44 +118,124 @@ export class NotificationService {
     }
   }
 
+  // Marcar todas as notificações como lidas
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    try {
+      const notificationsQuery = query(
+        collection(this.db, 'users', userId, 'notifications'),
+        where('read', '==', false)
+      )
+
+      const snapshot = await getDocs(notificationsQuery)
+      
+      const batch = snapshot.docs.map(async (document) => {
+        const notificationRef = doc(
+          this.db, 
+          'users', 
+          userId, 
+          'notifications', 
+          document.id
+        )
+        return updateDoc(notificationRef, { read: true })
+      })
+
+      await Promise.all(batch)
+    } catch (error) {
+      console.error('Erro ao marcar todas as notificações como lidas:', error)
+      throw error
+    }
+  }
+
   // Limpar notificações antigas
-  static async clearOldNotifications(
+  async clearOldNotifications(
     userId: string, 
     daysOld: number = 30
-  ) {
-    const db = getFirestore()
-    
+  ): Promise<void> {
     try {
       const thresholdTimestamp = Date.now() - (daysOld * 24 * 60 * 60 * 1000)
       
       const notificationsQuery = query(
-        collection(db, 'users', userId, 'notifications'),
+        collection(this.db, 'users', userId, 'notifications'),
         where('timestamp', '<', thresholdTimestamp)
       )
 
       const snapshot = await getDocs(notificationsQuery)
       
-      snapshot.docs.forEach(async (document) => {
-        await deleteDoc(doc(db, 'users', userId, 'notifications', document.id))
+      const batch = snapshot.docs.map(async (document) => {
+        const notificationRef = doc(
+          this.db, 
+          'users', 
+          userId, 
+          'notifications', 
+          document.id
+        )
+        return deleteDoc(notificationRef)
       })
+
+      await Promise.all(batch)
     } catch (error) {
       console.error('Erro ao limpar notificações antigas:', error)
       throw error
     }
   }
+
+  // Criar notificações para múltiplos usuários
+  async createBulkNotifications(
+    userIds: string[], 
+    notification: Omit<NotificationSchema, 'id' | 'read' | 'timestamp' | 'userId'>
+  ): Promise<void> {
+    try {
+      const notificationPromises = userIds.map(userId => 
+        this.createNotification(userId, notification)
+      )
+
+      await Promise.all(notificationPromises)
+    } catch (error) {
+      console.error('Erro ao criar notificações em massa:', error)
+      throw error
+    }
+  }
+
+  // Helpers para criar notificações comuns
+  static createTaskNotification(
+    userId: string, 
+    taskTitle: string, 
+    taskId: string
+  ): Omit<NotificationSchema, 'id' | 'read' | 'timestamp'> {
+    return {
+      userId,
+      type: 'task_created',
+      title: 'Nova Tarefa',
+      message: `Uma nova tarefa "${taskTitle}" foi criada`,
+      relatedEntityId: taskId
+    }
+  }
+
+  static createTaskAssignmentNotification(
+    userId: string, 
+    taskTitle: string, 
+    taskId: string
+  ): Omit<NotificationSchema, 'id' | 'read' | 'timestamp'> {
+    return {
+      userId,
+      type: 'task_assigned',
+      title: 'Tarefa Atribuída',
+      message: `Você foi atribuído à tarefa "${taskTitle}"`,
+      relatedEntityId: taskId
+    }
+  }
+
+  static createRewardNotification(
+    userId: string, 
+    coins: number
+  ): Omit<NotificationSchema, 'id' | 'read' | 'timestamp'> {
+    return {
+      userId,
+      type: 'reward_earned',
+      title: 'Recompensa Recebida',
+      message: `Você ganhou ${coins} moedas!`
+    }
+  }
 }
 
-// Funções auxiliares para criar notificações comuns
-export const NotificationHelpers = {
-  taskCreated: (taskTitle: string, assignedTo: string) => ({
-    type: 'task_created' as NotificationType,
-    title: 'Nova Tarefa Criada',
-    message: `A tarefa "${taskTitle}" foi criada e atribuída a você.`
-  }),
-
-  taskApproved: (taskTitle: string, rewardCoins: number) => ({
-    type: 'task_approved' as NotificationType,
-    title: 'Tarefa Aprovada',
-    message: `Sua tarefa "${taskTitle}" foi aprovada. Você ganhou ${rewardCoins} moedas!`
-  })
-}
+export const notificationService = new NotificationService()
