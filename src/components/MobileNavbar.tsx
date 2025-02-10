@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { 
-  Home, 
-  Briefcase, 
+import {
+  Home,
+  Briefcase,
   Settings,
   CheckCircle,
   Users as UsersIcon
@@ -9,17 +9,23 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-export const MobileNavbar: React.FC = () => {
+type Role = 'admin' | 'manager' | 'employee';
+
+interface MobileNavbarProps {
+    role: Role;
+}
+
+export const MobileNavbar: React.FC<MobileNavbarProps> = ({role}) => { //destructured here
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
 
   // Definir itens de menu com base na role do usuário
-  const getNavItems = (role: string | undefined) => {
+  const getNavItems = (role: Role | undefined) => {
     const commonItems = [
-      { 
-        icon: Home, 
-        label: 'Dashboard', 
+      {
+        icon: Home,
+        label: 'Dashboard',
         route: `/${role}/dashboard`,
         key: 'dashboard'
       }
@@ -33,35 +39,35 @@ export const MobileNavbar: React.FC = () => {
           route: '/admin/user-management',
           key: 'users'
         },
-        { 
-          icon: Briefcase, 
-          label: 'Projetos', 
+        {
+          icon: Briefcase,
+          label: 'Projetos',
           route: '/admin/projects',
           key: 'projects'
         },
-        { 
-          icon: CheckCircle, 
-          label: 'Tarefas', 
+        {
+          icon: CheckCircle,
+          label: 'Tarefas',
           route: '/admin/tasks',
           key: 'tasks'
         },
-        { 
-          icon: Settings, 
-          label: 'Configurações', 
+        {
+          icon: Settings,
+          label: 'Configurações',
           route: '/admin/settings',
           key: 'settings'
         }
       ],
       manager: [
-        { 
-          icon: Briefcase, 
-          label: 'Projetos', 
+        {
+          icon: Briefcase,
+          label: 'Projetos',
           route: '/manager/projects',
           key: 'projects'
         },
-        { 
-          icon: CheckCircle, 
-          label: 'Tarefas', 
+        {
+          icon: CheckCircle,
+          label: 'Tarefas',
           route: '/manager/tasks',
           key: 'tasks'
         },
@@ -73,9 +79,9 @@ export const MobileNavbar: React.FC = () => {
         }
       ],
       employee: [
-        { 
-          icon: CheckCircle, 
-          label: 'Tarefas', 
+        {
+          icon: CheckCircle,
+          label: 'Tarefas',
           route: '/employee/tasks',
           key: 'tasks'
         },
@@ -87,11 +93,14 @@ export const MobileNavbar: React.FC = () => {
         }
       ]
     }
+        if (role) {
+            return [...commonItems, ...(roleSpecificItems[role] || [])];
+        }
 
-    return [...commonItems, ...(roleSpecificItems[role] || [])]
+        return [...commonItems];
   }
 
-  const navItems = getNavItems(currentUser?.role)
+  const navItems = getNavItems(role)
 
   const handleNavigation = (route: string, key: string) => {
     setActiveTab(key)
@@ -105,15 +114,14 @@ export const MobileNavbar: React.FC = () => {
           <button
             key={item.key}
             onClick={() => handleNavigation(item.route, item.key)}
-            className={`flex flex-col items-center justify-center ${
-              activeTab === item.key 
-                ? 'text-blue-600' 
-                : 'text-gray-500'
-            }`}
+            className={`flex flex-col items-center justify-center ${activeTab === item.key
+              ? 'text-blue-600'
+              : 'text-gray-500'
+              }`}
           >
-            <item.icon 
-              size={24} 
-              strokeWidth={activeTab === item.key ? 2.5 : 1.5} 
+            <item.icon
+              size={24}
+              strokeWidth={activeTab === item.key ? 2.5 : 1.5}
             />
             <span className="text-xs mt-1">{item.label}</span>
           </button>

@@ -1,17 +1,17 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Layout } from '../../components/Layout'
-import { 
-  Target, 
-  CheckCircle, 
-  Clock, 
-  Award, 
-  TrendingUp 
+import {
+  Target,
+  CheckCircle,
+  Clock,
+  Award,
+  TrendingUp
 } from 'lucide-react'
 
 const StatCard: React.FC<{
-  icon: React.ElementType, 
-  title: string, 
-  value: string, 
+  icon: React.ElementType,
+  title: string,
+  value: string,
   color: string
 }> = ({ icon: Icon, title, value, color }) => (
   <div className="bg-white p-4 rounded-xl shadow-md flex items-center space-x-4 animate-fade-in">
@@ -26,6 +26,7 @@ const StatCard: React.FC<{
 )
 
 export const EmployeeDashboard: React.FC = () => {
+    const [isLoading, setIsLoading] = useState(true);
   const [tasks] = useState([
     {
       id: '1',
@@ -60,6 +61,15 @@ export const EmployeeDashboard: React.FC = () => {
     }
   ])
 
+    useEffect(() => {
+        // Simulate data fetching
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 750);
+
+        return () => clearTimeout(timer);
+    }, []);
+
   const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     const statusStyles = {
       'pending': 'bg-yellow-100 text-yellow-800',
@@ -83,7 +93,7 @@ export const EmployeeDashboard: React.FC = () => {
   }
 
   return (
-    <Layout role="employee">
+    <Layout role="employee" isLoading={isLoading}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
@@ -99,25 +109,25 @@ export const EmployeeDashboard: React.FC = () => {
 
         {/* Grid de Estatísticas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard 
+          <StatCard
             icon={Target}
             title="Tarefas Ativas"
             value="2"
             color="text-blue-600"
           />
-          <StatCard 
+          <StatCard
             icon={CheckCircle}
             title="Concluídas"
             value="15"
             color="text-green-600"
           />
-          <StatCard 
+          <StatCard
             icon={Clock}
             title="Pendentes"
             value="5"
             color="text-yellow-600"
           />
-          <StatCard 
+          <StatCard
             icon={TrendingUp}
             title="Moedas Ganhas"
             value="175"
@@ -134,8 +144,8 @@ export const EmployeeDashboard: React.FC = () => {
               Minhas Tarefas
             </h2>
             {tasks.map((task) => (
-              <div 
-                key={task.id} 
+              <div
+                key={task.id}
                 className="mb-4 pb-4 border-b last:border-b-0 flex justify-between items-center"
               >
                 <div>
@@ -164,8 +174,8 @@ export const EmployeeDashboard: React.FC = () => {
               Histórico de Recompensas
             </h2>
             {rewardHistory.map((reward) => (
-              <div 
-                key={reward.id} 
+              <div
+                key={reward.id}
                 className="mb-4 pb-4 border-b last:border-b-0 flex justify-between items-center"
               >
                 <div>

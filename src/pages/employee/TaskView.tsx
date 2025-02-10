@@ -1,11 +1,11 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Layout } from '../../components/Layout'
-import { 
-  CheckCircle, 
-  MessageCircle, 
-  Paperclip, 
-  Send, 
-  Clock 
+import {
+  CheckCircle,
+  MessageCircle,
+  Paperclip,
+  Send,
+  Clock
 } from 'lucide-react'
 
 type Task = {
@@ -22,6 +22,7 @@ type Task = {
 }
 
 export const TaskView: React.FC = () => {
+    const [isLoading, setIsLoading] = useState(true);
   const [task, setTask] = useState<Task>({
     id: '1',
     title: 'Desenvolver Componente UI',
@@ -36,28 +37,36 @@ export const TaskView: React.FC = () => {
       { id: '3', title: 'Implementar interações', completed: false }
     ],
     comments: [
-      { 
-        user: 'Maria (Gestor)', 
-        text: 'Foque na usabilidade e na experiência do usuário', 
-        date: '2024-02-22' 
+      {
+        user: 'Maria (Gestor)',
+        text: 'Foque na usabilidade e na experiência do usuário',
+        date: '2024-02-22'
       }
     ],
     attachments: [
-      { 
-        id: '1', 
-        name: 'design-mockup.figma', 
-        url: 'https://example.com/mockup.figma' 
+      {
+        id: '1',
+        name: 'design-mockup.figma',
+        url: 'https://example.com/mockup.figma'
       }
     ]
   })
 
   const [newComment, setNewComment] = useState('')
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setIsLoading(false);
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, []);
+
   const handleChecklistToggle = (itemId: string) => {
     setTask(prevTask => ({
       ...prevTask,
-      checklist: prevTask.checklist.map(item => 
-        item.id === itemId 
+      checklist: prevTask.checklist.map(item =>
+        item.id === itemId
           ? { ...item, completed: !item.completed }
           : item
       )
@@ -70,10 +79,10 @@ export const TaskView: React.FC = () => {
         ...prevTask,
         comments: [
           ...prevTask.comments,
-          { 
-            user: 'Carlos', 
-            text: newComment, 
-            date: new Date().toISOString().split('T')[0] 
+          {
+            user: 'Carlos',
+            text: newComment,
+            date: new Date().toISOString().split('T')[0]
           }
         ]
       }))
@@ -104,7 +113,7 @@ export const TaskView: React.FC = () => {
   }
 
   return (
-    <Layout role="employee">
+    <Layout role="employee" isLoading={isLoading}>
       <div className="space-y-8">
         <div className="flex justify-between items-center">
           <div>
@@ -132,17 +141,17 @@ export const TaskView: React.FC = () => {
                 <CheckCircle className="mr-2 text-green-600" /> Checklist
               </h2>
               {task.checklist.map((item) => (
-                <div 
-                  key={item.id} 
+                <div
+                  key={item.id}
                   className="flex items-center mb-2 pb-2 border-b last:border-b-0"
                 >
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={item.completed}
                     onChange={() => handleChecklistToggle(item.id)}
                     className="mr-3 form-checkbox text-blue-600"
                   />
-                  <span 
+                  <span
                     className={`flex-1 ${item.completed ? 'line-through text-gray-500' : 'text-gray-800'}`}
                   >
                     {item.title}
@@ -171,14 +180,14 @@ export const TaskView: React.FC = () => {
                 ))}
               </div>
               <div className="flex space-x-2">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Adicionar comentário..."
                   className="flex-1 px-4 py-2 border rounded-lg"
                 />
-                <button 
+                <button
                   onClick={handleAddComment}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
                 >
@@ -196,8 +205,8 @@ export const TaskView: React.FC = () => {
                   <span className="text-gray-500">Responsáveis</span>
                   <div className="flex space-x-2 mt-1">
                     {task.assignedTo.map((person, index) => (
-                      <span 
-                        key={index} 
+                      <span
+                        key={index}
                         className="bg-gray-100 px-2 py-1 rounded-full text-sm"
                       >
                         {person}
@@ -213,14 +222,14 @@ export const TaskView: React.FC = () => {
                 <Paperclip className="mr-2 text-gray-600" /> Anexos
               </h2>
               {task.attachments.map((attachment) => (
-                <div 
-                  key={attachment.id} 
+                <div
+                  key={attachment.id}
                   className="flex justify-between items-center mb-2 pb-2 border-b last:border-b-0"
                 >
                   <span className="text-gray-600">{attachment.name}</span>
-                  <a 
-                    href={attachment.url} 
-                    target="_blank" 
+                  <a
+                    href={attachment.url}
+                    target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline"
                   >
@@ -233,12 +242,12 @@ export const TaskView: React.FC = () => {
         </div>
 
         <div className="flex justify-end space-x-4">
-          <button 
+          <button
             className="bg-yellow-500 text-white px-6 py-2 rounded-lg hover:bg-yellow-600 transition"
           >
             Em Andamento
           </button>
-          <button 
+          <button
             className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
           >
             Marcar como Concluída
