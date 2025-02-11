@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react'
+    import React, { useState, useEffect } from 'react'
     import { useNavigate } from 'react-router-dom'
     import { LogIn, Lock } from 'lucide-react'
-    import { useAuth } from '../../context/AuthContext'
+    import { useAuth } from '../../context/AuthContext' // Corrected path
     import { Layout } from '../../components/Layout'
 
     export const Login: React.FC = () => {
@@ -63,8 +63,8 @@ import React, { useState, useEffect } from 'react'
       }
 
       return (
-        <Layout hideNavigation={true} isLoading={pageLoading}>
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-300">
+        <Layout hideNavigation={true} isLoading={pageLoading} className="bg-gradient-to-br from-blue-100 to-blue-300">
+            <div className="min-h-screen flex items-center justify-center">
             <div className="bg-white p-8 rounded-2xl shadow-2xl w-96 border border-gray-100">
                 <div className="text-center mb-8">
                 <img

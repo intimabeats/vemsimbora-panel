@@ -2,34 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Estilos globais para melhorar a experiência mobile */
-body {
-  @apply text-base antialiased;
+/* Global Styles with Apple-like Smoothness */
+body, html, #root { /* Crucial: #root needs to be here */
+  @apply 
+    text-base 
+    antialiased 
+    selection:bg-blue-100 
+    selection:text-blue-800 
+    scroll-smooth;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  font-family: 
+    -apple-system, 
+    BlinkMacSystemFont, 
+    'Segoe UI', 
+    Roboto, 
+    Oxygen, 
+    Ubuntu, 
+    Cantarell, 
+    'Open Sans', 
+    'Helvetica Neue', 
+    sans-serif;
+  margin: 0; /* Reset body margin */
+  height: 100%; /* Ensure full height */
+  min-height: 100vh; /* Add min-height for good measure */
 }
 
-/* Desabilitar zoom em inputs no iOS */
-input[type="text"],
-input[type="email"], 
-input[type="password"], 
-textarea, 
-select {
-  font-size: 16px;
-}
-
-/* Estilo para rolagem suave */
+/* Smooth Scrollbar */
 * {
   scrollbar-width: thin;
   scrollbar-color: theme('colors.blue.300') theme('colors.gray.100');
 }
 
-/* Animações de transição */
+/* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Hover and Focus States */
+.hover-lift {
+  @apply transition transform hover:-translate-y-1 hover:shadow-lg;
+}
+
+/* Translucent Backgrounds */
+.translucent-bg {
+  backdrop-filter: blur(10px);
+  background-color: rgba(255, 255, 255, 0.8);
 }
