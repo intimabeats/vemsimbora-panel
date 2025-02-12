@@ -8,20 +8,20 @@ import {
   LogOut,
   CheckCircle
 } from 'lucide-react'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/AuthContext' // Import useAuth
 import { useNavigate } from 'react-router-dom'
 import { NotificationBell } from './NotificationBell'
 import { LoadingScreen } from './LoadingScreen'
 
 
-type Role = 'admin' | 'manager' | 'employee';
+type Role = 'admin' | 'manager' | 'employee'; // Define a type for the role
 
 type SidebarProps = {
   role: Role;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ role }) => {
-  const { logout, currentUser } = useAuth()
+  const { logout, currentUser } = useAuth() // Use currentUser from context
   const navigate = useNavigate()
 
   const commonLinks = [
@@ -46,6 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
     ]
   }
 
+  // Defensive check: Use optional chaining and default to an empty array
   const links = [...commonLinks, ...(roleSpecificLinks[role] || [])];
 
   const handleLogout = async () => {
@@ -57,15 +58,17 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
     }
   }
 
+
+
   return (
     <>
       {/* Desktop Sidebar */}
       <div className="hidden md:block w-64 bg-white border-r shadow-md h-screen fixed left-0 top-0 p-4 flex flex-col">
         <div className="flex items-center mb-8">
           <img
-            src={currentUser?.photoURL || "https://images.unsplash.com/photo-1560179707-f14e90ef3623"}
+            src={currentUser?.photoURL || "https://images.unsplash.com/photo-1560179707-f14e90ef3623"} // Use currentUser.photoURL
             alt="Vem Simbora Logo"
-            className="w-12 h-12 rounded-full mr-4 object-cover"
+            className="w-12 h-12 rounded-full mr-4 object-cover" // Added object-cover
           />
           <div>
             <h2 className="text-xl font-bold text-gray-800">
@@ -104,25 +107,15 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
 
 export const Layout: React.FC<{
   children: ReactNode,
-  role?: Role,
+  role?: Role, // Use the Role type, make it optional
   isLoading?: boolean,
-  hideNavigation?: boolean;
-  className?: string; // Add className prop
-}> = ({ children, role = 'employee', isLoading = false, hideNavigation = false, className = '' }) => { // default className
+  hideNavigation?: boolean; // New prop
+}> = ({ children, role = 'employee', isLoading = false, hideNavigation = false }) => {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex">
       {!hideNavigation && <Sidebar role={role} />}
-      <main className={`
-        ${!hideNavigation ? 'md:ml-64' : ''} 
-        w-full 
-        ${hideNavigation ? '' : 'p-4 md:p-8'} 
-        bg-gray-50 
-        min-h-screen 
-        pt-safe-top 
-        pb-[calc(4rem+env(safe-area-inset-bottom))] 
-        md:pb-8
-        ${className} 
-      `}>
+      <main className={`${!hideNavigation ? 'md:ml-64' : ''} w-full p-4 md:p-8 bg-gray-50 min-h-screen pt-safe-top pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-8`}>
+        {/* Only render LoadingScreen if isLoading is true AND hideNavigation is false */}
         {isLoading && !hideNavigation ? <LoadingScreen /> : children}
       </main>
       {!hideNavigation && <MobileNavbar role={role} />}

@@ -1,3 +1,4 @@
+// src/App.tsx
 import React from 'react'
 import {
   BrowserRouter as Router,
@@ -15,7 +16,6 @@ import { Login } from './pages/auth/Login'
 import { ForgotPassword } from './pages/auth/ForgotPassword'
 import { Profile } from './pages/Profile'
 import { Unauthorized } from './pages/Unauthorized'
-import { LandingPage } from './pages/LandingPage' // Import Landing Page
 
 // Admin Imports
 import { AdminDashboard } from './pages/admin/Dashboard'
@@ -37,113 +37,112 @@ const App: React.FC = () => {
     <ErrorBoundary>
       <AuthProvider>
         <Router>
-          <div className="min-h-screen flex flex-col"> {/* CRUCIAL: Add this div */}
-            <Routes>
-              {/* Rota da Landing Page */}
-              <Route path="/" element={<LandingPage />} />
+          <Routes>
+            {/* Rotas de Autenticação */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
 
-              {/* Rotas de Autenticação */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/unauthorized" element={<Unauthorized />} />
+            {/* Rotas de Perfil */}
+            <Route
+              path="/profile"
+              element={
+                <PrivateRoute>
+                  <Profile />
+                </PrivateRoute>
+              }
+            />
 
-              {/* Rotas de Perfil */}
-              <Route
-                path="/profile"
-                element={
-                  <PrivateRoute>
-                    <Profile />
-                  </PrivateRoute>
-                }
-              />
+            {/* Rotas de Admin */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <PrivateRoute allowedRoles={['admin']}>
+                  <AdminDashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/user-management"
+              element={
+                <PrivateRoute allowedRoles={['admin']}>
+                  <UserManagement />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/projects"
+              element={
+                <PrivateRoute allowedRoles={['admin']}>
+                  <ProjectManagement />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/projects/:projectId"
+              element={
+                <PrivateRoute allowedRoles={['admin', 'manager']}>
+                  <ProjectDetails />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/projects/:projectId/chat"
+              element={
+                <PrivateRoute allowedRoles={['admin', 'manager']}>
+                  <ProjectChat />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/tasks"
+              element={
+                <PrivateRoute allowedRoles={['admin']}>
+                  <TaskManagement />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/settings"
+              element={
+                <PrivateRoute allowedRoles={['admin']}>
+                  <SystemSettings />
+                </PrivateRoute>
+              }
+            />
 
-              {/* Rotas de Admin */}
-              <Route
-                path="/admin/dashboard"
-                element={
-                  <PrivateRoute allowedRoles={['admin']}>
-                    <AdminDashboard />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/user-management"
-                element={
-                  <PrivateRoute allowedRoles={['admin']}>
-                    <UserManagement />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/projects"
-                element={
-                  <PrivateRoute allowedRoles={['admin']}>
-                    <ProjectManagement />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/projects/:projectId"
-                element={
-                  <PrivateRoute allowedRoles={['admin', 'manager']}>
-                    <ProjectDetails />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/projects/:projectId/chat"
-                element={
-                  <PrivateRoute allowedRoles={['admin', 'manager']}>
-                    <ProjectChat />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/tasks"
-                element={
-                  <PrivateRoute allowedRoles={['admin']}>
-                    <TaskManagement />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin/settings"
-                element={
-                  <PrivateRoute allowedRoles={['admin']}>
-                    <SystemSettings />
-                  </PrivateRoute>
-                }
-              />
+            {/* Rotas de Manager */}
+            <Route
+              path="/manager/dashboard"
+              element={
+                <PrivateRoute allowedRoles={['manager']}>
+                  <ManagerDashboard />
+                </PrivateRoute>
+              }
+            />
 
-              {/* Rotas de Manager */}
-              <Route
-                path="/manager/dashboard"
-                element={
-                  <PrivateRoute allowedRoles={['manager']}>
-                    <ManagerDashboard />
-                  </PrivateRoute>
-                }
-              />
+            {/* Rotas de Employee */}
+            <Route
+              path="/employee/dashboard"
+              element={
+                <PrivateRoute allowedRoles={['employee']}>
+                  <EmployeeDashboard />
+                </PrivateRoute>
+              }
+            />
 
-              {/* Rotas de Employee */}
-              <Route
-                path="/employee/dashboard"
-                element={
-                  <PrivateRoute allowedRoles={['employee']}>
-                    <EmployeeDashboard />
-                  </PrivateRoute>
-                }
-              />
+            {/* Rota Padrão */}
+            <Route
+              path="/"
+              element={<Navigate to="/login" replace />}
+            />
 
-              {/* Rota Padrão */}
-              {/* Remove the default redirect to /login */}
-              {/* 404 Not Found */}
-              <Route
-                path="*"
-                element={<div>Página não encontrada</div>}
-              />
-            </Routes>
-          </div>
+            {/* 404 Not Found */}
+            <Route
+              path="*"
+              element={<div>Página não encontrada</div>}
+            />
+          </Routes>
         </Router>
       </AuthProvider>
     </ErrorBoundary>

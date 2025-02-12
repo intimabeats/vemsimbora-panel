@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       react(),
-      // Expondo as variáveis necessárias, incluindo VITE_MAPBOX_TOKEN
+      // Expondo SOMENTE as variáveis necessárias
       envPlugin([
         'VITE_FIREBASE_API_KEY',
         'VITE_FIREBASE_AUTH_DOMAIN',
@@ -21,8 +21,7 @@ export default defineConfig(({ mode }) => {
         'VITE_FIREBASE_MEASUREMENT_ID',
         'VITE_SENTRY_DSN',
         'VITE_APP_ENV',
-        'SENTRY_AUTH_TOKEN',
-        'VITE_MAPBOX_TOKEN' // Add this line
+        'SENTRY_AUTH_TOKEN'
       ]),
       Sentry.sentryVitePlugin({
         org: "vemsimbora",          // Verifique se esse é o nome correto da organização
