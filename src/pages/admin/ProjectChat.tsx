@@ -1,3 +1,4 @@
+// src/pages/admin/ProjectChat.tsx
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
@@ -16,7 +17,7 @@ import { storage } from '../../config/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Message } from '../../components/Message'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
-import { getDefaultProfileImage } from '../../utils/user' // Import
+import { getDefaultProfileImage } from '../../utils/user'
 
 
 interface MessageType {
@@ -45,32 +46,33 @@ interface MessageType {
   }
 }
 
-// Functional component for the Managers Modal
+// Functional component for the Managers Modal (No changes needed here)
 const ManagersModal: React.FC<{ managers: any[]; onClose: () => void }> = ({ managers, onClose }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">Gestores do Projeto</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X size={24} />
-          </button>
+    // ... (Existing ManagersModal code) ...
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Gestores do Projeto</h2>
+              <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                <X size={24} />
+              </button>
+            </div>
+            <ul>
+              {managers.map((manager) => (
+                <li key={manager.id} className="flex items-center mb-3">
+                  <img
+                    src={manager.profileImage || getDefaultProfileImage(manager.name)}
+                    alt={manager.name}
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                  <span className="text-gray-800">{manager.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-        <ul>
-          {managers.map((manager) => (
-            <li key={manager.id} className="flex items-center mb-3">
-              <img
-                src={manager.profileImage || getDefaultProfileImage(manager.name)}
-                alt={manager.name}
-                className="w-10 h-10 rounded-full object-cover mr-3"
-              />
-              <span className="text-gray-800">{manager.name}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
+      );
 };
 
 export const ProjectChat: React.FC = () => {
@@ -98,25 +100,29 @@ export const ProjectChat: React.FC = () => {
   const closeManagersModal = () => setIsManagersModalOpen(false);
 
   // Load project data, messages, and users
-  useEffect(() => {
-    const loadProjectData = async () => {
-      try {
-        if (!projectId) throw new Error('Project ID is required')
-        setIsLoading(true)
-        setError(null)
+    useEffect(() => {
+        const loadProjectData = async () => {
+            try {
+                if (!projectId) throw new Error('Project ID is required');
+                setIsLoading(true);
+                setError(null);
 
-        const projectData = await projectService.getProjectById(projectId)
-        setProject(projectData)
+                const projectData = await projectService.getProjectById(projectId);
+                setProject(projectData);
 
-        const projectMessages = await projectService.getProjectMessages(projectId)
-        setMessages(projectMessages)
+                const projectMessages = await projectService.getProjectMessages(projectId);
+                setMessages(projectMessages);
 
-        const usersResponse = await userManagementService.fetchUsers()
-        const userMap = usersResponse.data.reduce((acc, user) => {
-          acc[user.id] = { name: user.name, photoURL: user.profileImage };
-          return acc;
-        }, {} as { [key: string]: { name: string; photoURL?: string } })
-        setUsers(userMap)
+                const usersResponse = await userManagementService.fetchUsers();
+                console.log("Fetched users:", usersResponse); // Log fetched users
+
+                const userMap = usersResponse.data.reduce((acc, user) => {
+                    acc[user.id] = { name: user.name, photoURL: user.profileImage }; // Use profileImage
+                    return acc;
+                }, {} as { [key: string]: { name: string; photoURL?: string } });
+                console.log("User map:", userMap); // Log the user map
+                setUsers(userMap);
+
 
         // Fetch manager data
         if (projectData && projectData.managers) {
@@ -151,89 +157,89 @@ export const ProjectChat: React.FC = () => {
     setAttachments(prev => [...prev, ...files])
   }
 
-const uploadFile = async (file: File) => {
-  const storageRef = ref(storage, `projects/${projectId}/chat/${Date.now()}_${file.name}`);
-  const uploadTask = uploadBytes(storageRef, file);
+    const uploadFile = async (file: File) => {
+        const storageRef = ref(storage, `projects/${projectId}/chat/${Date.now()}_${file.name}`);
+        const uploadTask = uploadBytes(storageRef, file);
 
-  return new Promise<{
-    id: string;
-    name: string;
-    url: string;
-    type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio';
-    size?: number;
-  }>((resolve, reject) => {
-    uploadTask.then(async (snapshot) => {
-      const url = await getDownloadURL(snapshot.ref);
-      const getFileType = (file: File) => {
-        if (file.type.startsWith('image/')) return 'image';
-        if (file.type.startsWith('video/')) return 'video';
-        if (file.type.startsWith('audio/')) return 'audio'; // Correctly identify audio
-        if (file.type.includes('document') || file.type.includes('pdf')) return 'document';
-        return 'other';
-      };
+        return new Promise<{
+            id: string;
+            name: string;
+            url: string;
+            type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio';
+            size?: number;
+        }>((resolve, reject) => {
+            uploadTask.then(async (snapshot) => {
+                const url = await getDownloadURL(snapshot.ref);
+                const getFileType = (file: File) => {
+                    if (file.type.startsWith('image/')) return 'image';
+                    if (file.type.startsWith('video/')) return 'video';
+                    if (file.type.startsWith('audio/')) return 'audio'; // Correctly identify audio
+                    if (file.type.includes('document') || file.type.includes('pdf')) return 'document';
+                    return 'other';
+                };
 
-      resolve({
-        id: Date.now().toString(),
-        name: file.name,
-        url,
-        type: getFileType(file),
-        size: file.size,
-      });
-    }).catch(reject);
-  });
-};
-
-
-const handleSendMessage = async () => {
-  setIsLoading(true);
-  setError(null);
-
-  try {
-    setUploadProgress(0);
-    let uploadedAttachments: {
-      id: string;
-      name: string;
-      url: string;
-      type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio';
-      size?: number;
-    }[] = [];
-
-    if (attachments.length > 0) {
-      const uploadPromises = attachments.map((file) => uploadFile(file));
-      uploadedAttachments = await Promise.all(uploadPromises);
-    }
-
-    const newMessageObj: MessageType = {
-      id: Date.now().toString(),
-      userId: currentUser!.uid,
-      userName: currentUser!.displayName || users[currentUser!.uid]?.name || 'Usuário',
-      content: newMessage,
-      timestamp: Date.now(),
-      attachments: uploadedAttachments,
-      quotedMessage: quotedMessage
-        ? {
-            userName: quotedMessage.userName,
-            content: quotedMessage.content,
-            attachments: quotedMessage.attachments,
-          }
-        : null, // Ensure quotedMessage is null if not present
+                resolve({
+                    id: Date.now().toString(),
+                    name: file.name,
+                    url,
+                    type: getFileType(file),
+                    size: file.size,
+                });
+            }).catch(reject);
+        });
     };
 
-    // Add the new message to Firestore
-    await projectService.addProjectMessage(projectId!, newMessageObj);
 
-    // Update local state
-    setMessages((prevMessages) => [...prevMessages, newMessageObj]);
-    setNewMessage('');
-    setAttachments([]);
-    setUploadProgress(0);
-    setQuotedMessage(null); // Clear quoted message
-  } catch (err: any) {
-    setError(err.message || 'Failed to send message');
-  } finally {
-    setIsLoading(false);
-  }
-};
+    const handleSendMessage = async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            setUploadProgress(0);
+            let uploadedAttachments: {
+                id: string;
+                name: string;
+                url: string;
+                type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio';
+                size?: number;
+            }[] = [];
+
+            if (attachments.length > 0) {
+                const uploadPromises = attachments.map((file) => uploadFile(file));
+                uploadedAttachments = await Promise.all(uploadPromises);
+            }
+
+            const newMessageObj: MessageType = {
+                id: Date.now().toString(),
+                userId: currentUser!.uid,
+                userName: currentUser!.displayName || users[currentUser!.uid]?.name || 'Usuário',
+                content: newMessage,
+                timestamp: Date.now(),
+                attachments: uploadedAttachments,
+                quotedMessage: quotedMessage
+                    ? {
+                        userName: quotedMessage.userName,
+                        content: quotedMessage.content,
+                        attachments: quotedMessage.attachments,
+                    }
+                    : null, // Ensure quotedMessage is null if not present
+            };
+
+            // Add the new message to Firestore
+            await projectService.addProjectMessage(projectId!, newMessageObj);
+
+            // Update local state
+            setMessages((prevMessages) => [...prevMessages, newMessageObj]);
+            setNewMessage('');
+            setAttachments([]);
+            setUploadProgress(0);
+            setQuotedMessage(null); // Clear quoted message
+        } catch (err: any) {
+            setError(err.message || 'Failed to send message');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
 
   const handleDeleteMessage = async () => {
@@ -318,9 +324,10 @@ const handleSendMessage = async () => {
         <div
 
             className="flex-1 overflow-y-auto bg-gray-50 pb-[env(safe-area-inset-bottom)]"
+            ref={chatContainerRef}
 
         >
-          {messages.map((message, index) => (
+                    {messages.map((message, index) => (
             <Message
               key={message.id}
               message={message}
@@ -330,6 +337,7 @@ const handleSendMessage = async () => {
               }}
               onQuote={(message) => setQuotedMessage({ userName: message.userName, content: message.content, attachments: message.attachments })}
               isFirstMessage={index === 0}
+              users={users} // Pass the users prop here
             />
           ))}
         </div>

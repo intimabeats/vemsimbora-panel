@@ -1,3 +1,4 @@
+// src/utils/user.ts (Add logging)
 export const getDefaultProfileImage = (name: string | undefined | null): string => {
   // Handle null or undefined name
   const initial = name ? name.charAt(0).toUpperCase() : '?'; // Use '?' as default
@@ -9,5 +10,8 @@ export const getDefaultProfileImage = (name: string | undefined | null): string 
       </text>
     </svg>
   `;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  const dataURL = `data:image/svg+xml;base64,${btoa(svg)}`;
+    console.log("getDefaultProfileImage - dataURL:", dataURL); // Log the generated data URL
+  return dataURL
 };
+

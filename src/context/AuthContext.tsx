@@ -1,3 +1,4 @@
+// src/context/AuthContext.tsx
 import React, {
   createContext,
   useState,
@@ -63,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   const updateUser = useCallback(async (user: User | null) => {
+    console.log("AuthContext updateUser - user:", user); // Log the user object
     if (user) {
       try {
         // Tentar restaurar dados do usuário do localStorage
@@ -70,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser)
+            console.log("AuthContext updateUser - storedUser:", parsedUser);
 
           // Verificar validade do token
           const token = await getIdToken(user, true)
@@ -82,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           // Se não houver dados no localStorage, buscar do Firestore
           const userDoc = await AuthService.login(user.email!, '')
+            console.log("AuthContext updateUser - userDoc from Firestore:", userDoc);
           setCurrentUser({
             ...user,
             role: userDoc.role,
@@ -133,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     try {
       const user = await AuthService.login(email, password)
+        console.log("AuthContext login - user after AuthService.login:", user); // Log after login
 
       // Salvar dados no localStorage
       localStorage.setItem('user', JSON.stringify({

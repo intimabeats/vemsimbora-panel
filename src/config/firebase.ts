@@ -132,7 +132,6 @@ export const AuthService = {
     }
   },
 
-  // Update user profile
   updateProfile: async (userId: string, updates: any) => {
     try {
       const userRef = doc(db, 'users', userId)
@@ -148,7 +147,9 @@ export const AuthService = {
           authUpdates.photoURL = updates.photoURL;
         }
         if (Object.keys(authUpdates).length > 0) {
+          console.log("firebase.ts - Updating auth profile with:", authUpdates); // Log auth updates
           await updateProfile(auth.currentUser, authUpdates);
+          console.log("firebase.ts - Auth profile updated successfully"); // Log success
         }
       }
 

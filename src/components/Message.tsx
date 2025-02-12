@@ -1,9 +1,9 @@
+// src/components/Message.tsx (Updated with more specific logging)
 import React from 'react'
 import { Trash2, CornerDownLeft } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { AttachmentDisplay } from './AttachmentDisplay'
-import { getDefaultProfileImage } from '../utils/user' // Import the utility
-
+import { getDefaultProfileImage } from '../utils/user'
 
 interface MessageProps {
   message: {
@@ -33,21 +33,34 @@ interface MessageProps {
   }
   onDelete: (messageId: string) => void
   onQuote: (message: { userName: string; content: string, attachments?: any[] }) => void
-  isFirstMessage: boolean; // Add this prop
+  isFirstMessage: boolean;
+  users: { [key: string]: { name: string; photoURL?: string } }; // Receive users prop
 }
 
-export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote, isFirstMessage }) => {
+export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote, isFirstMessage, users }) => {
   const { currentUser } = useAuth()
   const isCurrentUserMessage = message.userId === currentUser?.uid
+
+    console.log("Message component - message:", message);
+    console.log("Message component - users:", users);
+
+    const user = users ? users[message.userId] : null;
+    console.log("Message component - user:", user);
+
+    // VERY specific logging here:
+    const imageSrc = user?.photoURL || getDefaultProfileImage(user?.name || message.userName || '');
+    console.log("Message component - imageSrc:", imageSrc);
+    console.log("Message component - user?.photoURL:", user?.photoURL);
+
 
   return (
     <div
       className={`group flex items-start gap-3 mb-4 ${
         isCurrentUserMessage ? 'flex-row-reverse' : ''
-      } ${isFirstMessage ? 'mt-4' : ''}`} // Add conditional margin-top
+      } ${isFirstMessage ? 'mt-4' : ''}`}
     >
       <img
-        src={message.userId === currentUser?.uid ? (currentUser?.photoURL || getDefaultProfileImage(currentUser?.displayName || '')) : (getDefaultProfileImage(message.userName || ''))} // Use default image
+        src={imageSrc} // Use the calculated imageSrc
         alt={message.userName}
         className="w-10 h-10 rounded-full object-cover"
       />
