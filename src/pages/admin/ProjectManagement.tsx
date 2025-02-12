@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Layout } from '../../components/Layout'
 import {
   Plus,
@@ -16,6 +16,7 @@ import { projectService } from '../../services/ProjectService'
 import { CreateProjectModal } from '../../components/modals/CreateProjectModal'
 import { EditProjectModal } from '../../components/modals/EditProjectModal'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
+import useDebounce from '../../utils/useDebounce'; // Import the debounce hook
 
 export const ProjectManagement: React.FC = () => {
   const [projects, setProjects] = useState<ProjectSchema[]>([])
@@ -24,6 +25,7 @@ export const ProjectManagement: React.FC = () => {
     status?: ProjectSchema['status']
   }>({})
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500); // Debounce the search term
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1)
@@ -36,41 +38,41 @@ export const ProjectManagement: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
+    // useCallback to prevent unnecessary re-renders of fetchProjects
+    const fetchProjects = useCallback(async () => {
+        try {
+            setLoading(true);
+            const options: {
+                status?: ProjectSchema['status'];
+                excludeStatus?: ProjectSchema['status'];
+                limit: number;
+                page: number;
+            } = {
+                limit: itemsPerPage,
+                page: currentPage,
+            };
+
+            if (filter.status) {
+                options.status = filter.status;
+            } else {
+                options.excludeStatus = 'archived'; // Exclude archived by default
+            }
+
+            const fetchedProjects = await projectService.fetchProjects(options);
+            setProjects(fetchedProjects.data);
+            setTotalPages(fetchedProjects.totalPages);
+
+        } catch (error) {
+            console.error('Erro ao buscar projetos:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [filter.status, currentPage, itemsPerPage]); // Correct dependencies
+
   useEffect(() => {
     fetchProjects()
-  }, [filter, currentPage, searchTerm])
+  }, [filter, currentPage, debouncedSearchTerm, fetchProjects]); // Use debouncedSearchTerm
 
-  const fetchProjects = async () => {
-    try {
-      setLoading(true);
-
-      // Correctly construct the options object
-      const options: {
-        status?: ProjectSchema['status'];
-        excludeStatus?: ProjectSchema['status'];
-        limit: number;
-        page: number;
-      } = {
-        limit: itemsPerPage,
-        page: currentPage,
-      };
-
-      if (filter.status) {
-        options.status = filter.status;
-      } else {
-        options.excludeStatus = 'archived'; // Exclude archived by default
-      }
-
-      const fetchedProjects = await projectService.fetchProjects(options);
-
-      setProjects(fetchedProjects.data);
-      setTotalPages(fetchedProjects.totalPages);
-    } catch (error) {
-      console.error('Erro ao buscar projetos:', error)
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const handleDeleteProject = async () => {
     if (!selectedProject) return
@@ -129,11 +131,7 @@ export const ProjectManagement: React.FC = () => {
     }
   };
 
-    //search logic
-    const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.description.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+
 
   const StatusBadge: React.FC<{ status: ProjectSchema['status'] }> = ({ status }) => {
     const statusStyles = {
@@ -212,12 +210,17 @@ export const ProjectManagement: React.FC = () => {
 
           {/* Project Cards (Grid Layout) */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProjects.length === 0 ? (
+            {projects.length === 0 ? (
               <div className="text-center py-4 col-span-full">
                 Nenhum projeto encontrado
               </div>
             ) : (
-              filteredProjects.map((project) => (
+              projects
+              .filter((project) =>
+                project.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||  // Use debouncedSearchTerm
+                project.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+              )
+              .map((project) => (
                 <div key={project.id} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition group">
                   <div className="flex justify-between items-start mb-4">
                     <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition">

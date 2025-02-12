@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
 import {
+  BarChart2,
   CheckCircle,
   Clock,
   MessageCircle,
@@ -18,6 +19,7 @@ import { taskService } from '../../services/TaskService'
 import { userManagementService } from '../../services/UserManagementService'
 import { useAuth } from '../../context/AuthContext'
 import { ProjectSchema, TaskSchema } from '../../types/firestore-schema'
+import { getDefaultProfileImage } from '../../utils/user' // Corrected Import
 
 // FileItem Component
 const FileItem: React.FC<{
@@ -70,14 +72,13 @@ export const ProjectDetails: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { currentUser } = useAuth()
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // State
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [project, setProject] = useState<ProjectSchema | null>(null)
   const [tasks, setTasks] = useState<TaskSchema[]>([])
-  const [users, setUsers] = useState<{[key: string]: string}>({})
+  const [users, setUsers] = useState<{[key: string]: {name: string, profileImage?: string}}>({}) // Corrected type
   const [attachments, setAttachments] = useState<any[]>([]); // Store attachments
 
   // Load project data
@@ -101,12 +102,15 @@ export const ProjectDetails: React.FC = () => {
 
         // Fetch users
         const usersResponse = await userManagementService.fetchUsers()
+        console.log("Fetched users:", usersResponse); // Debug log
 
         // Create users map
         const userMap = usersResponse.data.reduce((acc, user) => {
-          acc[user.id] = user.name
-          return acc
-        }, {} as {[key: string]: string})
+          acc[user.id] = { name: user.name, profileImage: user.profileImage }; // Include profileImage
+          return acc;
+        }, {} as { [key: string]: { name: string; profileImage?: string } }) // Corrected type
+        setUsers(userMap)
+
 
         // Fetch project messages and extract attachments
         const projectMessages = await projectService.getProjectMessages(projectId);
@@ -152,14 +156,18 @@ export const ProjectDetails: React.FC = () => {
   }
 
   const getProjectManagerNames = () => {
-    if (!project || !project.managers || project.managers.length === 0) {
-      return 'Sem gestores'
+    if (!project || !project.managers) {
+      return 'Sem gestores';
     }
 
+    // Map manager IDs to names, handling potential missing users
     return project.managers
-      .map(managerId => users[managerId] || managerId)
-      .join(', ')
-  }
+      .map(managerId => {
+        const manager = users[managerId];
+        return manager ? manager.name : `Unknown User (${managerId})`;
+      })
+      .join(', ');
+  };
 
   // Render loading or error states
   if (isLoading) {
@@ -170,10 +178,8 @@ export const ProjectDetails: React.FC = () => {
     return (
       <Layout role="admin" isLoading={false}>
         <div className="container mx-auto p-6">
-          {/* Verificação adicional */}
           {project ? (
             <>
-              {/* Conteúdo existente */}
               <div className="bg-white rounded-xl shadow-md p-6 mb-6">
                 <div className="flex justify-between items-center mb-4">
                   <div>
@@ -218,8 +224,6 @@ export const ProjectDetails: React.FC = () => {
                     <p className="font-medium">{getProjectManagerNames()}</p>
                   </div>
                 </div>
-
-                {/* Resto do código existente */}
               </div>
             </>
           ) : (
@@ -336,7 +340,20 @@ export const ProjectDetails: React.FC = () => {
             )}
             <div>
               <span className="text-sm text-gray-500">Gestores</span>
-              <p className="font-medium">{getProjectManagerNames()}</p>
+              <div className="flex items-center mt-1">
+                {project.managers.map((managerId) => {
+                  const manager = users[managerId];
+                  return (
+                    <div key={managerId} className="relative w-8 h-8 rounded-full overflow-hidden mr-2">
+                      <img
+                        src={manager?.profileImage || getDefaultProfileImage(manager?.name)}
+                        alt={manager?.name || 'Unknown Manager'}
+                        className='object-cover w-full h-full'
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

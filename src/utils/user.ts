@@ -1,5 +1,6 @@
-export const getDefaultProfileImage = (name: string): string => {
-  const initial = name.charAt(0).toUpperCase();
+export const getDefaultProfileImage = (name: string | undefined | null): string => {
+  // Handle null or undefined name
+  const initial = name ? name.charAt(0).toUpperCase() : '?'; // Use '?' as default
   const svg = `
     <svg width="40" height="40" xmlns="http://www.w3.org/2000/svg">
       <rect width="100%" height="100%" fill="#3b82f6" />

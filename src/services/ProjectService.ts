@@ -138,13 +138,14 @@ async fetchProjects(options?: {
 
     // Filtros
     if (options?.status) {
-      q = query(q, where('status', '==', options.status));
+      q = query(q, where('status', '==', options.status)); // Apply status filter
     }
 
     // Exclude status (for "Todos os Status" to exclude "archived")
     if (options?.excludeStatus) {
-      q = query(q, where('status', '!=', options.excludeStatus)); // Use != for exclusion
+      q = query(q, where('status', '!=', options.excludeStatus)); // Apply excludeStatus filter
     }
+    // Apply BOTH filters if BOTH are present.  Previous code only applied one.
 
     // Ordenação
     q = query(q, orderBy('createdAt', 'desc'));

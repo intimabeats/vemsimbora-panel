@@ -16,6 +16,7 @@ import { storage } from '../../config/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Message } from '../../components/Message'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
+import { getDefaultProfileImage } from '../../utils/user' // Import
 
 
 interface MessageType {
@@ -59,7 +60,7 @@ const ManagersModal: React.FC<{ managers: any[]; onClose: () => void }> = ({ man
           {managers.map((manager) => (
             <li key={manager.id} className="flex items-center mb-3">
               <img
-                src={manager.profileImage || 'https://via.placeholder.com/40'}
+                src={manager.profileImage || getDefaultProfileImage(manager.name)}
                 alt={manager.name}
                 className="w-10 h-10 rounded-full object-cover mr-3"
               />
@@ -135,6 +136,8 @@ export const ProjectChat: React.FC = () => {
 
     loadProjectData()
   }, [projectId])
+
+
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -276,11 +279,12 @@ const handleSendMessage = async () => {
   const displayedManagers = managers.slice(0, MAX_MANAGERS_DISPLAY);
   const remainingManagersCount = managers.length - MAX_MANAGERS_DISPLAY;
 
+
   return (
     <Layout role="admin">
       <div className="flex flex-col h-screen">
-        {/* Header */}
-        <div className="bg-white shadow-md p-4 flex-shrink-0">
+        {/* Fixed Header */}
+        <div  className="bg-white shadow-md p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate(`/admin/projects/${projectId}`)}
@@ -297,7 +301,7 @@ const handleSendMessage = async () => {
             {displayedManagers.map((manager) => (
               <img
                 key={manager.id}
-                src={manager.profileImage || 'https://via.placeholder.com/30'}
+                src={manager.profileImage || getDefaultProfileImage(manager.name)}
                 alt={manager.name}
                 className="w-8 h-8 rounded-full object-cover border-2 border-white ml-[-0.5rem]"
               />
@@ -312,8 +316,9 @@ const handleSendMessage = async () => {
 
         {/* Chat Container (scrollable) */}
         <div
-            ref={chatContainerRef}
+
             className="flex-1 overflow-y-auto bg-gray-50 pb-[env(safe-area-inset-bottom)]"
+
         >
           {messages.map((message, index) => (
             <Message
@@ -330,7 +335,7 @@ const handleSendMessage = async () => {
         </div>
 
         {/*  Input Area */}
-        <div className="bg-white p-4 shadow-md flex-shrink-0">
+        <div  className="bg-white p-4 shadow-md flex-shrink-0">
           {/* Quoted Message Display */}
           {quotedMessage && (
             <div className="mb-4 p-3 bg-gray-100 rounded-lg flex items-center justify-between">
