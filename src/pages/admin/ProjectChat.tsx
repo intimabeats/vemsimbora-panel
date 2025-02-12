@@ -6,7 +6,8 @@ import {
   Paperclip,
   Send,
   ArrowLeft,
-  X
+  X,
+  Users
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { projectService } from '../../services/ProjectService'
@@ -43,6 +44,34 @@ interface MessageType {
   }
 }
 
+// Functional component for the Managers Modal
+const ManagersModal: React.FC<{ managers: any[]; onClose: () => void }> = ({ managers, onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Gestores do Projeto</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={24} />
+          </button>
+        </div>
+        <ul>
+          {managers.map((manager) => (
+            <li key={manager.id} className="flex items-center mb-3">
+              <img
+                src={manager.profileImage || 'https://via.placeholder.com/40'}
+                alt={manager.name}
+                className="w-10 h-10 rounded-full object-cover mr-3"
+              />
+              <span className="text-gray-800">{manager.name}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+};
+
 export const ProjectChat: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
@@ -61,7 +90,11 @@ export const ProjectChat: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null)
   const [quotedMessage, setQuotedMessage] = useState<MessageType | null>(null)
+  const [isManagersModalOpen, setIsManagersModalOpen] = useState(false);
+  const [managers, setManagers] = useState<any[]>([]);
 
+  const openManagersModal = () => setIsManagersModalOpen(true);
+  const closeManagersModal = () => setIsManagersModalOpen(false);
 
   useEffect(() => {
     const loadProjectData = async () => {
@@ -82,6 +115,14 @@ export const ProjectChat: React.FC = () => {
           return acc;
         }, {} as { [key: string]: { name: string; photoURL?: string } })
         setUsers(userMap)
+
+        // Fetch manager data
+        if (projectData && projectData.managers) {
+          const managerData = await Promise.all(
+            projectData.managers.map((managerId: string) => userManagementService.getUserById(managerId))
+          );
+          setManagers(managerData);
+        }
 
       } catch (err: any) {
         console.error('Error loading project data:', err)
@@ -219,7 +260,7 @@ const handleSendMessage = async () => {
   if (error) {
     return (
       <Layout role="admin">
-        <div className="container mx-auto p-6">
+        <div className="p-6">
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
             <strong className="font-bold">Erro: </strong>
             <span className="block sm:inline">{error}</span>
@@ -229,31 +270,50 @@ const handleSendMessage = async () => {
     )
   }
 
+  const MAX_MANAGERS_DISPLAY = 5;
+  const displayedManagers = managers.slice(0, MAX_MANAGERS_DISPLAY);
+  const remainingManagersCount = managers.length - MAX_MANAGERS_DISPLAY;
+
   return (
     <Layout role="admin">
       <div className="flex flex-col h-screen">
         {/* Fixed Header */}
-        <div className="bg-white shadow-md p-4">
+        <div className="bg-white shadow-md p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate(`/admin/projects/${projectId}`)}
-              className="flex items-center text-gray-600 hover:text-gray-900"
+              className="text-gray-600 hover:text-gray-900"
             >
-              <ArrowLeft className="mr-2" /> Voltar ao Projeto
+              <ArrowLeft size={24} />
             </button>
-            <h1 className="text-xl font-semibold text-gray-900">
-              Chat: {project?.name}
+            <h1 className="text-xl font-semibold text-gray-900 text-center flex-grow">
+              {project?.name}
             </h1>
-            <div className="w-auto" /> {/* Removed fixed width */}
+          </div>
+            {/* Display Managers */}
+          <div className="flex items-center justify-center mt-2 cursor-pointer" onClick={openManagersModal}>
+            {displayedManagers.map((manager) => (
+              <img
+                key={manager.id}
+                src={manager.profileImage || 'https://via.placeholder.com/30'}
+                alt={manager.name}
+                className="w-8 h-8 rounded-full object-cover border-2 border-white ml-[-0.5rem]"
+              />
+            ))}
+            {remainingManagersCount > 0 && (
+              <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center ml-[-0.5rem]">
+                +{remainingManagersCount}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Chat Container (scrollable) */}
         <div
           ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-4 bg-gray-50"
+          className="flex-1 overflow-y-auto bg-gray-50"
         >
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <Message
               key={message.id}
               message={message}
@@ -262,12 +322,13 @@ const handleSendMessage = async () => {
                 setIsDeleteModalOpen(true);
               }}
               onQuote={(message) => setQuotedMessage({ userName: message.userName, content: message.content, attachments: message.attachments })}
+              isFirstMessage={index === 0} // Pass isFirstMessage prop
             />
           ))}
         </div>
 
         {/* Fixed Footer */}
-        <div className="bg-white p-4 shadow-md">
+        <div className="bg-white p-4 shadow-md flex-shrink-0">
           {/* Quoted Message Display */}
           {quotedMessage && (
             <div className="mb-4 p-3 bg-gray-100 rounded-lg flex items-center justify-between">
@@ -356,6 +417,10 @@ const handleSendMessage = async () => {
         itemName="esta mensagem"
         warningMessage="Esta ação não poderá ser desfeita."
       />
+      {/* Managers Modal */}
+      {isManagersModalOpen && (
+        <ManagersModal managers={managers} onClose={closeManagersModal} />
+      )}
     </Layout>
   )
 }

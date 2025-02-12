@@ -32,9 +32,10 @@ interface MessageProps {
   }
   onDelete: (messageId: string) => void
   onQuote: (message: { userName: string; content: string, attachments?: any[] }) => void
+  isFirstMessage: boolean; // Add this prop
 }
 
-export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote }) => {
+export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote, isFirstMessage }) => {
   const { currentUser } = useAuth()
   const isCurrentUserMessage = message.userId === currentUser?.uid
 
@@ -42,12 +43,12 @@ export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote }) 
     <div
       className={`group flex items-start gap-3 mb-4 ${
         isCurrentUserMessage ? 'flex-row-reverse' : ''
-      }`}
+      } ${isFirstMessage ? 'mt-4' : ''}`} // Add conditional margin-top
     >
       <img
         src={currentUser?.photoURL || 'https://via.placeholder.com/40'}
         alt={message.userName}
-        className="w-10 h-10 rounded-full object-cover mt-1"
+        className="w-10 h-10 rounded-full object-cover"
       />
       <div
         className={`max-w-[70%] p-3 rounded-lg shadow ${
@@ -67,12 +68,11 @@ export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote }) 
           <div className="mb-2 p-2 bg-gray-100 rounded-lg text-sm">
             <div className="font-semibold text-gray-700">{message.quotedMessage.userName}</div>
             <div className="text-gray-600">{message.quotedMessage.content}</div>
+            {/* Display attachments in quoted message */}
             {message.quotedMessage.attachments && message.quotedMessage.attachments.length > 0 && (
-              <div className="mt-1 flex flex-col gap-1">
+              <div className="mt-1 flex flex-wrap gap-1">
                 {message.quotedMessage.attachments.map((attachment) => (
-                  <div key={attachment.id} className="flex items-center">
-                    <AttachmentDisplay attachment={attachment} color="text-blue-600" />
-                  </div>
+                  <AttachmentDisplay key={attachment.id} attachment={attachment} color="text-blue-600" />
                 ))}
               </div>
             )}
