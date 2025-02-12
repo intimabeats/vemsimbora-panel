@@ -46,9 +46,8 @@ interface MessageType {
   }
 }
 
-// Functional component for the Managers Modal (No changes needed here)
+// Functional component for the Managers Modal
 const ManagersModal: React.FC<{ managers: any[]; onClose: () => void }> = ({ managers, onClose }) => {
-    // ... (Existing ManagersModal code) ...
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-96 max-h-[80vh] overflow-y-auto">
@@ -114,13 +113,13 @@ export const ProjectChat: React.FC = () => {
                 setMessages(projectMessages);
 
                 const usersResponse = await userManagementService.fetchUsers();
-                console.log("Fetched users:", usersResponse); // Log fetched users
+                // console.log("Fetched users (from within ProjectChat):", usersResponse); // Log fetched users
 
                 const userMap = usersResponse.data.reduce((acc, user) => {
                     acc[user.id] = { name: user.name, photoURL: user.profileImage }; // Use profileImage
                     return acc;
                 }, {} as { [key: string]: { name: string; photoURL?: string } });
-                console.log("User map:", userMap); // Log the user map
+                // console.log("User map (within ProjectChat):", userMap); // Log the user map
                 setUsers(userMap);
 
 
@@ -327,7 +326,7 @@ export const ProjectChat: React.FC = () => {
             ref={chatContainerRef}
 
         >
-                    {messages.map((message, index) => (
+          {messages.map((message, index) => (
             <Message
               key={message.id}
               message={message}
@@ -337,7 +336,7 @@ export const ProjectChat: React.FC = () => {
               }}
               onQuote={(message) => setQuotedMessage({ userName: message.userName, content: message.content, attachments: message.attachments })}
               isFirstMessage={index === 0}
-              users={users} // Pass the users prop here
+              users={users}
             />
           ))}
         </div>

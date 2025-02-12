@@ -1,4 +1,4 @@
-// src/components/Message.tsx (Updated with more specific logging)
+// src/components/Message.tsx
 import React from 'react'
 import { Trash2, CornerDownLeft } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -41,26 +41,16 @@ export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote, is
   const { currentUser } = useAuth()
   const isCurrentUserMessage = message.userId === currentUser?.uid
 
-    console.log("Message component - message:", message);
-    console.log("Message component - users:", users);
-
     const user = users ? users[message.userId] : null;
-    console.log("Message component - user:", user);
-
-    // VERY specific logging here:
-    const imageSrc = user?.photoURL || getDefaultProfileImage(user?.name || message.userName || '');
-    console.log("Message component - imageSrc:", imageSrc);
-    console.log("Message component - user?.photoURL:", user?.photoURL);
-
 
   return (
     <div
-      className={`group flex items-start gap-3 mb-4 ${
+      className={`group flex items-start gap-3 mb-4 px-4 ${ // Added px-4 here
         isCurrentUserMessage ? 'flex-row-reverse' : ''
       } ${isFirstMessage ? 'mt-4' : ''}`}
     >
       <img
-        src={imageSrc} // Use the calculated imageSrc
+        src={user?.photoURL || getDefaultProfileImage(user?.name || message.userName || '')}
         alt={message.userName}
         className="w-10 h-10 rounded-full object-cover"
       />

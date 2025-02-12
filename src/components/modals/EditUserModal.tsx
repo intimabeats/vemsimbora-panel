@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { 
-  UserCog, 
-  X, 
-  CheckCircle, 
-  AlertTriangle 
+// src/components/modals/EditUserModal.tsx
+import React, { useState, useEffect, useRef } from 'react'
+import {
+  UserCog,
+  X,
+  CheckCircle,
+  AlertTriangle,
+  Camera
 } from 'lucide-react'
 import { userManagementService } from '../../services/UserManagementService'
 import { Validation } from '../../utils/validation'
@@ -16,11 +18,11 @@ interface EditUserModalProps {
   onUserUpdated: (updatedUser: UserSchema) => void
 }
 
-export const EditUserModal: React.FC<EditUserModalProps> = ({ 
-  user, 
-  isOpen, 
-  onClose, 
-  onUserUpdated 
+export const EditUserModal: React.FC<EditUserModalProps> = ({
+  user,
+  isOpen,
+  onClose,
+  onUserUpdated
 }) => {
   const [formData, setFormData] = useState<Partial<UserSchema>>({
     name: user.name,
@@ -28,42 +30,43 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
     role: user.role,
     status: user.status
   })
-  const [errors, setErrors] = useState<{[key: string]: string}>({})
+  const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); // State for selected file
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
 
-  // Resetar estado quando o usuário mudar
+  // Resetar estado quando o usuário mudar ou o modal fechar
   useEffect(() => {
-    setFormData({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      status: user.status
-    })
+      if(isOpen){
+        setFormData({
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status
+        });
+    }
     setErrors({})
     setServerError(null)
-  }, [user])
+    setSelectedFile(null); // Reset file selection
+  }, [user, isOpen])
 
   const validateForm = () => {
-    const newErrors: {[key: string]: string} = {}
+    const newErrors: { [key: string]: string } = {}
 
-    // Validar nome
     if (!Validation.isValidName(formData.name || '')) {
       newErrors.name = 'Nome inválido. Digite nome e sobrenome.'
     }
 
-    // Validar email
     if (!Validation.isValidEmail(formData.email || '')) {
       newErrors.email = 'Email inválido.'
     }
 
-    // Validar role
     const validRoles: UserSchema['role'][] = ['admin', 'manager', 'employee']
     if (!formData.role || !validRoles.includes(formData.role)) {
       newErrors.role = 'Função inválida.'
     }
 
-    // Validar status
     const validStatuses: UserSchema['status'][] = ['active', 'inactive', 'suspended']
     if (!formData.status || !validStatuses.includes(formData.status)) {
       newErrors.status = 'Status inválido.'
@@ -76,13 +79,12 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setServerError(null)
-    
+
     if (!validateForm()) return
 
     setIsLoading(true)
 
     try {
-      // Preparar dados para atualização
       const updateData: Partial<UserSchema> = {
         name: formData.name,
         email: formData.email,
@@ -90,28 +92,19 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         status: formData.status
       }
 
-      // Remover campos que não mudaram
       Object.keys(updateData).forEach(key => {
         if (updateData[key] === user[key]) {
           delete updateData[key]
         }
       })
 
-      // Atualizar apenas se houver mudanças
-      if (Object.keys(updateData).length > 0) {
-        await userManagementService.updateUser(user.id, updateData)
-        
-        // Chamar callback com usuário atualizado
-        onUserUpdated({
-          ...user,
-          ...updateData
-        })
-      }
-
+      // Pass the selectedFile to updateUser
+      const updatedUser = await userManagementService.updateUser(user.id, updateData, selectedFile);
+      onUserUpdated(updatedUser);
       onClose()
     } catch (error: any) {
       setServerError(
-        error.message || 
+        error.message ||
         'Erro ao atualizar usuário. Tente novamente.'
       )
     } finally {
@@ -127,16 +120,21 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       ...prev,
       [name]: value
     }))
-    
-    // Limpar erro específico ao digitar
+
     if (errors[name]) {
       setErrors(prev => {
-        const newErrors = {...prev}
+        const newErrors = { ...prev }
         delete newErrors[name]
         return newErrors
       })
     }
   }
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files && event.target.files.length > 0) {
+            setSelectedFile(event.target.files[0]);
+        }
+    };
 
   if (!isOpen) return null
 
@@ -148,7 +146,7 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             <UserCog className="mr-2 text-blue-600" />
             Editar Usuário
           </h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
@@ -165,8 +163,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           )}
 
           <div>
-            <label 
-              htmlFor="name" 
+            <label
+              htmlFor="name"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
               Nome Completo
@@ -178,9 +176,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               value={formData.name || ''}
               onChange={handleChange}
               placeholder="Digite nome e sobrenome"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
-                ${errors.name 
-                  ? 'border-red-500 focus:ring-red-500' 
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none
+                ${errors.name
+                  ? 'border-red-500 focus:ring-red-500'
                   : 'focus:ring-2 focus:ring-blue-500'
                 }`}
             />
@@ -190,8 +188,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
 
           <div>
-            <label 
-              htmlFor="email" 
+            <label
+              htmlFor="email"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
               Email
@@ -203,9 +201,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               value={formData.email || ''}
               onChange={handleChange}
               placeholder="usuario@empresa.com"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
-                ${errors.email 
-                  ? 'border-red-500 focus:ring-red-500' 
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none
+                ${errors.email
+                  ? 'border-red-500 focus:ring-red-500'
                   : 'focus:ring-2 focus:ring-blue-500'
                 }`}
             />
@@ -215,8 +213,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
 
           <div>
-            <label 
-              htmlFor="role" 
+            <label
+              htmlFor="role"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
               Função
@@ -226,9 +224,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               name="role"
               value={formData.role || ''}
               onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
-                ${errors.role 
-                  ? 'border-red-500 focus:ring-red-500' 
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none
+                ${errors.role
+                  ? 'border-red-500 focus:ring-red-500'
                   : 'focus:ring-2 focus:ring-blue-500'
                 }`}
             >
@@ -242,8 +240,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
           </div>
 
           <div>
-            <label 
-              htmlFor="status" 
+            <label
+              htmlFor="status"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
               Status
@@ -253,9 +251,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               name="status"
               value={formData.status || ''}
               onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
-                ${errors.status 
-                  ? 'border-red-500 focus:ring-red-500' 
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none
+                ${errors.status
+                  ? 'border-red-500 focus:ring-red-500'
                   : 'focus:ring-2 focus:ring-blue-500'
                 }`}
             >
@@ -268,6 +266,28 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             )}
           </div>
 
+            {/* File Input */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                Foto de Perfil
+                </label>
+                <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                ref={fileInputRef}
+                className="hidden"
+                />
+                <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                >
+                <Camera className="mr-2" />
+                {selectedFile ? selectedFile.name : 'Selecionar Imagem'}
+                </button>
+            </div>
+
           <div className="pt-4 flex space-x-4">
             <button
               type="button"
@@ -279,9 +299,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-2 rounded-lg text-white transition 
-                ${isLoading 
-                  ? 'bg-blue-400 cursor-not-allowed' 
+              className={`w-full py-2 rounded-lg text-white transition
+                ${isLoading
+                  ? 'bg-blue-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700'
                 }`}
             >

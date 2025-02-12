@@ -14,4 +14,3 @@ export const getDefaultProfileImage = (name: string | undefined | null): string 
     console.log("getDefaultProfileImage - dataURL:", dataURL); // Log the generated data URL
   return dataURL
 };
-
