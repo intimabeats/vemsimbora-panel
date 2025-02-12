@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { 
-  UserPlus, 
-  X, 
-  CheckCircle, 
-  AlertTriangle 
+import {
+  UserPlus,
+  X,
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react'
 import { userManagementService } from '../../services/UserManagementService'
 import { Validation } from '../../utils/validation'
@@ -15,15 +15,16 @@ interface CreateUserModalProps {
   onUserCreated: (user: UserSchema) => void
 }
 
-export const CreateUserModal: React.FC<CreateUserModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onUserCreated 
+export const CreateUserModal: React.FC<CreateUserModalProps> = ({
+  isOpen,
+  onClose,
+  onUserCreated
 }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    role: 'employee' as UserSchema['role']
+    role: 'employee' as UserSchema['role'],
+    password: '' // Added password field
   })
   const [errors, setErrors] = useState<{[key: string]: string}>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -48,6 +49,11 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
       newErrors.role = 'Função inválida.'
     }
 
+    // Validate password
+    if (!Validation.isStrongPassword(formData.password)) {
+      newErrors.password = 'Senha inválida. A senha deve ter pelo menos 8 caracteres, uma letra maiúscula, uma minúscula, um número e um caractere especial.'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -55,23 +61,25 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setServerError(null)
-    
+
     if (!validateForm()) return
 
     setIsLoading(true)
 
     try {
       const newUser = await userManagementService.createUser({
-        ...formData,
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
         status: 'active',
         coins: 0
-      })
+      }, formData.password) // Pass the password
 
       onUserCreated(newUser)
       onClose()
     } catch (error: any) {
       setServerError(
-        error.message || 
+        error.message ||
         'Erro ao criar usuário. Tente novamente.'
       )
     } finally {
@@ -87,7 +95,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
       ...prev,
       [name]: value
     }))
-    
+
     // Limpar erro específico ao digitar
     if (errors[name]) {
       setErrors(prev => {
@@ -108,7 +116,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
             <UserPlus className="mr-2 text-blue-600" />
             Criar Novo Usuário
           </h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
           >
@@ -125,8 +133,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           )}
 
           <div>
-            <label 
-              htmlFor="name" 
+            <label
+              htmlFor="name"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
               Nome Completo
@@ -139,8 +147,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               onChange={handleChange}
               placeholder="Digite nome e sobrenome"
               className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
-                ${errors.name 
-                  ? 'border-red-500 focus:ring-red-500' 
+                ${errors.name
+                  ? 'border-red-500 focus:ring-red-500'
                   : 'focus:ring-2 focus:ring-blue-500'
                 }`}
             />
@@ -150,8 +158,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
           </div>
 
           <div>
-            <label 
-              htmlFor="email" 
+            <label
+              htmlFor="email"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
               Email
@@ -164,8 +172,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               onChange={handleChange}
               placeholder="usuario@empresa.com"
               className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
-                ${errors.email 
-                  ? 'border-red-500 focus:ring-red-500' 
+                ${errors.email
+                  ? 'border-red-500 focus:ring-red-500'
                   : 'focus:ring-2 focus:ring-blue-500'
                 }`}
             />
@@ -173,10 +181,34 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               <p className="text-red-500 text-xs mt-1">{errors.email}</p>
             )}
           </div>
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Senha
+            </label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Senha"
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
+                ${errors.password
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'focus:ring-2 focus:ring-blue-500'
+                }`}
+            />
+            {errors.password && (
+              <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+            )}
+          </div>
 
           <div>
-            <label 
-              htmlFor="role" 
+            <label
+              htmlFor="role"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
               Função
@@ -187,8 +219,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               value={formData.role}
               onChange={handleChange}
               className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
-                ${errors.role 
-                  ? 'border-red-500 focus:ring-red-500' 
+                ${errors.role
+                  ? 'border-red-500 focus:ring-red-500'
                   : 'focus:ring-2 focus:ring-blue-500'
                 }`}
             >
@@ -206,8 +238,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
               type="submit"
               disabled={isLoading}
               className={`w-full py-2 rounded-lg text-white transition 
-                ${isLoading 
-                  ? 'bg-blue-400 cursor-not-allowed' 
+                ${isLoading
+                  ? 'bg-blue-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700'
                 }`}
             >

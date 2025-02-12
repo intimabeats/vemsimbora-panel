@@ -31,14 +31,17 @@ export class UserManagementService {
   // Criar novo usuário
   async createUser(
     userData: Omit<UserSchema, 'id' | 'createdAt' | 'updatedAt' | 'coins'>,
-    password: string
+    password: string // Accept password as a separate argument
   ): Promise<UserSchema> {
     try {
       // Criar usuário no Firebase Authentication
+      if (!password) {
+        throw new Error("Password is required");
+      }
       const userCredential = await createUserWithEmailAndPassword(
         this.auth,
         userData.email,
-        password
+        password // Use the password argument
       )
 
       const user = userCredential.user
@@ -65,10 +68,10 @@ export class UserManagementService {
       throw error
     }
   }
-
-  // Atualizar usuário
+    // ... (rest of the methods remain unchanged)
+      // Atualizar usuário
   async updateUser(
-    userId: string, 
+    userId: string,
     updates: Partial<UserSchema>,
     profileImage?: File
   ): Promise<UserSchema> {
@@ -122,10 +125,10 @@ export class UserManagementService {
     limit?: number
     page?: number
     searchTerm?: string
-  }): Promise<{ 
-    data: UserSchema[]; 
-    totalPages: number; 
-    totalUsers: number 
+  }): Promise<{
+    data: UserSchema[];
+    totalPages: number;
+    totalUsers: number
   }> {
     try {
       let q = query(collection(this.db, 'users'))
@@ -143,7 +146,7 @@ export class UserManagementService {
       if (options?.searchTerm) {
         const searchTerm = options.searchTerm.toLowerCase()
         q = query(
-          q, 
+          q,
           where('name', '>=', searchTerm),
           where('name', '<=', searchTerm + '\uf8ff')
         )
@@ -211,7 +214,7 @@ export class UserManagementService {
 
   // Gerenciar moedas do usuário
   async updateUserCoins(
-    userId: string, 
+    userId: string,
     coinsToAdd: number
   ): Promise<number> {
     try {
@@ -239,13 +242,13 @@ export class UserManagementService {
 
   // Registrar histórico de transações de moedas
   async logCoinTransaction(
-    userId: string, 
-    amount: number, 
+    userId: string,
+    amount: number,
     description: string
   ) {
     try {
       const transactionRef = doc(collection(this.db, 'users', userId, 'coin_transactions'))
-      
+
       await setDoc(transactionRef, {
         amount,
         description,
