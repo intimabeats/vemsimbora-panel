@@ -29,36 +29,41 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
     managers: [] as string[]
   })
   const [managers, setManagers] = useState<{ id: string, name: string }[]>([])
-  const [managersLoading, setManagersLoading] = useState(false); // Loading state
+  const [managersLoading, setManagersLoading] = useState(false);
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [step, setStep] = useState(1) // Controla os passos
+  const [step, setStep] = useState(1)
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
 
-  // Carregar gestores
-  useEffect(() => {
-    const fetchManagers = async () => {
-      setManagersLoading(true); // Set loading to true
-      try {
-        const fetchedManagers = await userManagementService.fetchUsers({
-          role: 'manager'
-        })
-        setManagers(fetchedManagers.data.map(user => ({
-          id: user.id,
-          name: user.name
-        })))
-      } catch (err) {
-        console.error('Erro ao buscar gestores:', err)
-        setError('Failed to load managers.'); // Set an error message
-      } finally {
-        setManagersLoading(false); // Set loading to false
-      }
-    }
+  // Fetch managers
+useEffect(() => {
+  const fetchManagers = async () => {
+    setManagersLoading(true);
+    setError(null);
+    try {
+      // Explicitly specify the role filter.
+      const fetchedManagers = await userManagementService.fetchUsers({ role: 'manager' });
 
-    if (isOpen) {
-      fetchManagers()
+      // Map the results to the expected { id, name } format.
+      const managerList = fetchedManagers.data.map(user => ({
+        id: user.id,
+        name: user.name
+      }));
+      setManagers(managerList);
+
+    } catch (err: any) {
+      console.error('Error fetching managers:', err);  // Detailed error logging
+      setError(err.message || 'Failed to load managers.');
+    } finally {
+      setManagersLoading(false);
     }
-  }, [isOpen])
+  };
+
+  if (isOpen) {
+    fetchManagers();
+  }
+}, [isOpen]);
+
 
     // Reset form when modal opens/closes
   useEffect(() => {
@@ -156,12 +161,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Display general error */}
-          {error && (
+          {error ? (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center">
               <AlertTriangle className="mr-2" />
               {error}
             </div>
-          )}
+          ) : null}
 
           {step === 1 && (
             <>

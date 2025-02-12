@@ -5,11 +5,16 @@ import {
   Briefcase,
   Users,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
 import { userManagementService } from '../../services/UserManagementService'
 import { taskService } from '../../services/TaskService'
+import { activityService } from '../../services/ActivityService'; // Import the new service
+import { ActivityLogSchema, ProjectSchema, TaskSchema } from '../../types/firestore-schema';
+
 
 const StatCard: React.FC<{
   icon: React.ElementType,
@@ -44,23 +49,38 @@ const ProgressBar: React.FC<{ name: string; progress: number; color: string }> =
   </div>
 )
 
+// Helper function to calculate project progress
+const calculateProjectProgress = (tasks: TaskSchema[]): number => {
+  if (!tasks.length) return 0;
+  const completedTasks = tasks.filter(task => task.status === 'completed').length;
+  return Math.round((completedTasks / tasks.length) * 100);
+};
+
+
 export const AdminDashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [projectCount, setProjectCount] = useState(0);
   const [userCount, setUserCount] = useState(0);
   const [completedTasksCount, setCompletedTasksCount] = useState(0);
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
-  const [projectsProgress, setProjectsProgress] = useState<{ name: string; progress: number; color: string }[]>([]);
-  const [recentActivities, setRecentActivities] = useState<{ user: string; action: string; project: string; time: string }[]>([]);
-  const [error, setError] = useState<string | null>(null); // Add error state
+  const [projects, setProjects] = useState<ProjectSchema[]>([]); // Store projects
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [recentActivities, setRecentActivities] = useState<ActivityLogSchema[]>([]); // Use the new type
+  const [error, setError] = useState<string | null>(null);
+    const [projectsWithTasks, setProjectsWithTasks] = useState<{ project: ProjectSchema; tasks: TaskSchema[] }[]>([]);
+
 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      setError(null); // Clear any previous errors
+      setError(null);
       try {
-        const projects = await projectService.fetchProjects();
-        setProjectCount(projects.totalProjects);
+        const projectsResponse = await projectService.fetchProjects({ limit: 9, page: currentPage });
+        const projectsData = projectsResponse.data;
+        setProjects(projectsData);
+        setTotalPages(projectsResponse.totalPages);
+        setProjectCount(projectsResponse.totalProjects); // Get total project count
 
         const users = await userManagementService.fetchUsers();
         setUserCount(users.totalUsers);
@@ -71,38 +91,21 @@ export const AdminDashboard: React.FC = () => {
         const pendingTasks = await taskService.fetchTasks({ status: 'pending' });
         setPendingTasksCount(pendingTasks.totalTasks);
 
-        // Simulate project progress data (replace with actual data fetching)
-        setProjectsProgress([
-          { name: "Novo Produto", progress: 75, color: "bg-blue-500" },
-          { name: "Marketing Digital", progress: 45, color: "bg-green-500" },
-          { name: "Infraestrutura", progress: 90, color: "bg-purple-500" },
-          { name: "Treinamento RH", progress: 30, color: "bg-yellow-500" }
-        ]);
+        // Fetch recent activities
+        const activities = await activityService.getRecentActivities();
+        setRecentActivities(activities);
 
-        // Simulate recent activity data
-        setRecentActivities([
-          {
-            user: "Carlos Silva",
-            action: "Concluiu Tarefa",
-            project: "Novo Produto",
-            time: "2 horas atrás"
-          },
-          {
-            user: "Maria Santos",
-            action: "Iniciou Projeto",
-            project: "Marketing Digital",
-            time: "5 horas atrás"
-          },
-          {
-            user: "João Oliveira",
-            action: "Adicionou Nova Tarefa",
-            project: "Infraestrutura",
-            time: "1 dia atrás"
-          }
-        ]);
+        // Fetch tasks for each project *before* rendering.
+        const projectsWithTasksPromises = projectsData.map(async (project) => {
+          const tasksResponse = await taskService.fetchTasks({ projectId: project.id });
+          return { project, tasks: tasksResponse.data };
+        });
+        const projectsWithTasksResult = await Promise.all(projectsWithTasksPromises);
+        setProjectsWithTasks(projectsWithTasksResult);
+
 
       } catch (err: any) {
-        setError(err.message || 'Erro ao buscar dados.'); // Set error message
+        setError(err.message || 'Erro ao buscar dados.');
         console.error("Error fetching data:", err);
       } finally {
         setIsLoading(false);
@@ -110,7 +113,7 @@ export const AdminDashboard: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [currentPage]); // Add currentPage as a dependency
 
   return (
     <Layout role="admin" isLoading={isLoading}>
@@ -160,9 +163,39 @@ export const AdminDashboard: React.FC = () => {
                 Progresso dos Projetos
               </h2>
               <div className="space-y-4">
-                {projectsProgress.map((project, index) => (
-                  <ProgressBar key={index} {...project} />
-                ))}
+                {projectsWithTasks.map(({ project, tasks }) => { // Destructure here
+                  const progress = calculateProjectProgress(tasks);
+                  return (
+                    <ProgressBar
+                      key={project.id}
+                      name={project.name}
+                      progress={progress}
+                      color="bg-blue-500"
+                    />
+                  );
+                })}
+              </div>
+              {/* Pagination Controls */}
+              <div className="flex justify-between items-center mt-4">
+                <span className="text-sm text-gray-600">
+                  {currentPage} de {totalPages}
+                </span>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border rounded-lg disabled:opacity-50 flex items-center"
+                  >
+                    <ChevronLeft className="mr-2" /> Anterior
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 border rounded-lg disabled:opacity-50 flex items-center"
+                  >
+                    Próximo <ChevronRight className="ml-2" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -179,12 +212,16 @@ export const AdminDashboard: React.FC = () => {
                     className="flex justify-between items-center pb-2 border-b last:border-b-0"
                   >
                     <div>
-                      <p className="font-medium text-gray-700 text-sm">{activity.user}</p>
+                      <p className="font-medium text-gray-700 text-sm">{activity.userName}</p>
                       <p className="text-xs text-gray-500">
-                        {activity.action} em {activity.project}
+                        {/*Improved this line to be more readable*/}
+                        {activity.type} {activity.projectId ? `no projeto ${activity.projectId}` : ''}
+                        {activity.taskId ? `na tarefa ${activity.taskId}`: ''}
                       </p>
                     </div>
-                    <span className="text-xs text-gray-400">{activity.time}</span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(activity.timestamp).toLocaleTimeString()}
+                    </span>
                   </div>
                 ))}
               </div>

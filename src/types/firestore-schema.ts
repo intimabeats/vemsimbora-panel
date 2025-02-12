@@ -89,7 +89,7 @@ export interface RewardSchema {
 export interface NotificationSchema {
   id: string
   userId: string
-  type: 'task_created' | 'task_assigned' | 'task_completed' | 'project_update' | 'reward_earned'
+  type: 'task_created' | 'task_assigned' | 'task_completed' | 'project_update' | 'reward_earned' | 'system_alert'
   title: string
   message: string
   read: boolean
@@ -109,3 +109,15 @@ export interface SystemSettingsSchema {
   pushNotifications: boolean
   weeklyReports: boolean
 }
+
+// Activity Log Schema
+export interface ActivityLogSchema {
+    id: string;
+    userId: string;
+    userName: string;
+    type: 'project_created' | 'project_updated' | 'task_created' | 'task_updated' | 'task_completed' | 'user_login' | 'user_created' | 'other'; // Add other types as needed
+    projectId?: string; // Optional, if related to a project
+    taskId?: string;    // Optional, if related to a task
+    details?: string;   // Optional, for additional details
+    timestamp: number;
+  }

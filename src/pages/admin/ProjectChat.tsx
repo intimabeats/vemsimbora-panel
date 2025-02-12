@@ -92,6 +92,8 @@ export const ProjectChat: React.FC = () => {
   const [quotedMessage, setQuotedMessage] = useState<MessageType | null>(null)
   const [isManagersModalOpen, setIsManagersModalOpen] = useState(false);
   const [managers, setManagers] = useState<any[]>([]);
+    const [headerHeight, setHeaderHeight] = useState(0); // Add state for header height
+    const headerRef = useRef<HTMLDivElement>(null); // Ref for the header
 
   const openManagersModal = () => setIsManagersModalOpen(true);
   const closeManagersModal = () => setIsManagersModalOpen(false);
@@ -134,6 +136,13 @@ export const ProjectChat: React.FC = () => {
 
     loadProjectData()
   }, [projectId])
+
+    useEffect(() => {
+    // Measure the header height after it renders
+    if (headerRef.current) {
+      setHeaderHeight(headerRef.current.offsetHeight);
+    }
+  }, [project]); // Re-run when project data changes
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -278,7 +287,7 @@ const handleSendMessage = async () => {
     <Layout role="admin">
       <div className="flex flex-col h-screen">
         {/* Fixed Header */}
-        <div className="bg-white shadow-md p-4 flex-shrink-0">
+        <div ref={headerRef} className="bg-white shadow-md p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate(`/admin/projects/${projectId}`)}
@@ -312,6 +321,9 @@ const handleSendMessage = async () => {
         <div
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto bg-gray-50"
+          style={{
+            height: `calc(100vh - ${headerHeight}px - 56px - env(safe-area-inset-bottom))`,  // Calculate available height
+          }}
         >
           {messages.map((message, index) => (
             <Message
@@ -328,7 +340,7 @@ const handleSendMessage = async () => {
         </div>
 
         {/* Fixed Footer */}
-        <div className="bg-white p-4 shadow-md flex-shrink-0">
+        <div className="bg-white p-4 shadow-md flex-shrink-0 fixed bottom-14 md:bottom-0 w-full md:w-[calc(100%-16rem)]"> {/* Modified Line */}
           {/* Quoted Message Display */}
           {quotedMessage && (
             <div className="mb-4 p-3 bg-gray-100 rounded-lg flex items-center justify-between">

@@ -35,38 +35,43 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
     managers: project.managers
   })
   const [managers, setManagers] = useState<{ id: string, name: string }[]>([])
-    const [managersLoading, setManagersLoading] = useState(false); // Add loading state
+  const [managersLoading, setManagersLoading] = useState(false);
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [step, setStep] = useState(1) // Controla os passos
+  const [step, setStep] = useState(1)
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
 
-  // Carregar gestores
+  // Fetch managers
   useEffect(() => {
     const fetchManagers = async () => {
-        setManagersLoading(true);
+      setManagersLoading(true);
+      setError(null);
       try {
         const fetchedManagers = await userManagementService.fetchUsers({
-          role: 'manager'
-        })
-        setManagers(fetchedManagers.data.map(user => ({
+          role: 'manager' // Ensure the role filter is correctly passed
+        });
+        // Map the results to the expected {id, name} format
+        const managerList = fetchedManagers.data.map(user => ({
           id: user.id,
           name: user.name
-        })))
-      } catch (err) {
-        console.error('Erro ao buscar gestores:', err)
-          setError('Failed to load managers');
+        }));
+        setManagers(managerList);
+
+      } catch (err: any) {
+        console.error('Erro ao buscar gestores:', err);
+        setError(err.message || 'Failed to load managers.');
       } finally {
-          setManagersLoading(false);
+        setManagersLoading(false);
       }
-    }
+    };
 
     if (isOpen) {
-      fetchManagers()
+      fetchManagers();
     }
-  }, [isOpen])
+  }, [isOpen]);
 
-  // Resetar estado quando o projeto mudar
+
+  // Reset form state when the project changes
   useEffect(() => {
     setFormData({
       name: project.name,
@@ -128,7 +133,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
     setError(null)
 
     try {
-      // Preparar dados para atualização
+      // Prepare data for update
       const updateData: Partial<ProjectSchema> = {
         name: formData.name,
         description: formData.description,
@@ -142,10 +147,10 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
         managers: formData.managers
       }
 
-      // Atualizar projeto
+      // Update project
       await projectService.updateProject(project.id, updateData)
 
-      // Chamar callback com projeto atualizado
+      // Call callback with updated project
       onProjectUpdated({
         ...project,
         ...updateData
@@ -179,12 +184,12 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Display general error */}
-          {error && (
+          {error ? ( // Corrected: Use ternary
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center">
               <AlertTriangle className="mr-2" />
               {error}
             </div>
-          )}
+          ) : null}
 
           {step === 1 && (
             <>

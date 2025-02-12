@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react'
+import React, { ReactNode, useState, useEffect } from 'react' // Import useState and useEffect
 import { MobileNavbar } from './MobileNavbar'
 import {
   Home,
@@ -110,10 +110,12 @@ export const Layout: React.FC<{
   isLoading?: boolean,
   hideNavigation?: boolean;
 }> = ({ children, role = 'employee', isLoading = false, hideNavigation = false }) => {
+
+
   return (
     <div className="flex">
       {!hideNavigation && <Sidebar role={role} />}
-      <main className={`${!hideNavigation ? 'md:ml-64' : ''} w-full bg-gray-50 min-h-screen pt-safe-top`}>
+      <main className={`${!hideNavigation ? 'md:ml-64' : ''} w-full bg-gray-50 min-h-screen pt-safe-top`}> {/* Removed padding-bottom */}
         {isLoading ? <LoadingScreen /> : children}
       </main>
       {!hideNavigation && <MobileNavbar role={role} />}
