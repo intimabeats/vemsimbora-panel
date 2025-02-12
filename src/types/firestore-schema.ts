@@ -19,7 +19,7 @@ export interface ProjectSchema {
   description: string
   startDate: number
   endDate?: number
-  status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled'
+  status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived' // Added 'archived'
   managers: string[]
   createdBy: string
   createdAt: number

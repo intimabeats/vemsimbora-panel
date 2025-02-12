@@ -36,7 +36,8 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       open: true,
-      cors: true
+      cors: true,
+      historyApiFallback: true, // THIS IS THE KEY CHANGE FOR SPA ROUTING
     },
     preview: {
       port: 8080

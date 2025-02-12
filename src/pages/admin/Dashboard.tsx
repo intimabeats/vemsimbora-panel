@@ -12,14 +12,14 @@ import {
 import { projectService } from '../../services/ProjectService'
 import { userManagementService } from '../../services/UserManagementService'
 import { taskService } from '../../services/TaskService'
-import { activityService } from '../../services/ActivityService'; // Import the new service
+import { activityService } from '../../services/ActivityService';
 import { ActivityLogSchema, ProjectSchema, TaskSchema } from '../../types/firestore-schema';
 
 
 const StatCard: React.FC<{
   icon: React.ElementType,
   title: string,
-  value: string | number, // Allow numbers
+  value: string | number,
   color: string
 }> = ({ icon: Icon, title, value, color }) => (
   <div className="bg-white p-4 rounded-xl shadow-md flex items-center space-x-4">
@@ -48,7 +48,31 @@ const ProgressBar: React.FC<{ name: string; progress: number; color: string }> =
     </div>
   </div>
 )
+const StatusBadge: React.FC<{ status: ProjectSchema['status'] }> = ({ status }) => {
+    const statusStyles = {
+      planning: 'bg-yellow-100 text-yellow-800',
+      active: 'bg-green-100 text-green-800',
+      completed: 'bg-blue-100 text-blue-800',
+      paused: 'bg-gray-100 text-gray-800',
+      cancelled: 'bg-red-100 text-red-800',
+      archived: 'bg-gray-400 text-white'
+    }
 
+    const statusLabels = {
+      planning: 'Planejamento',
+      active: 'Ativo',
+      completed: 'Concluído',
+      paused: 'Pausado',
+      cancelled: 'Cancelado',
+      archived: 'Arquivado'
+    }
+
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusStyles[status]}`}>
+        {statusLabels[status]}
+      </span>
+    )
+  }
 // Helper function to calculate project progress
 const calculateProjectProgress = (tasks: TaskSchema[]): number => {
   if (!tasks.length) return 0;
@@ -76,7 +100,7 @@ export const AdminDashboard: React.FC = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const projectsResponse = await projectService.fetchProjects({ limit: 9, page: currentPage });
+        const projectsResponse = await projectService.fetchProjects({ limit: 9, page: currentPage, excludeStatus: 'archived' }); // Exclude archived
         const projectsData = projectsResponse.data;
         setProjects(projectsData);
         setTotalPages(projectsResponse.totalPages);
@@ -166,12 +190,17 @@ export const AdminDashboard: React.FC = () => {
                 {projectsWithTasks.map(({ project, tasks }) => { // Destructure here
                   const progress = calculateProjectProgress(tasks);
                   return (
+                    <div key={project.id}>
                     <ProgressBar
-                      key={project.id}
+                      
                       name={project.name}
                       progress={progress}
                       color="bg-blue-500"
                     />
+                    <div className='flex justify-end'>
+                    <StatusBadge status={project.status} />
+                    </div>
+                    </div>
                   );
                 })}
               </div>
@@ -214,7 +243,6 @@ export const AdminDashboard: React.FC = () => {
                     <div>
                       <p className="font-medium text-gray-700 text-sm">{activity.userName}</p>
                       <p className="text-xs text-gray-500">
-                        {/*Improved this line to be more readable*/}
                         {activity.type} {activity.projectId ? `no projeto ${activity.projectId}` : ''}
                         {activity.taskId ? `na tarefa ${activity.taskId}`: ''}
                       </p>

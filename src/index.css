@@ -33,3 +33,7 @@ select {
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
+
+:root {
+  --input-height: 56px; /* Default input height */
+}

@@ -30,7 +30,7 @@ export class ProjectService {
         createdBy: auth.currentUser?.uid || '',
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        commentTabs: [
+        commentTabs: [  //Keep for future use
           {
             id: 'general',
             name: 'Geral',
@@ -126,49 +126,55 @@ async addProjectMessage(
     }
   }
 
-  // Buscar projetos com paginação e filtros
-  async fetchProjects(options?: {
-    status?: ProjectSchema['status']
-    limit?: number
-    page?: number
-  }) {
-    try {
-      let q = query(collection(this.db, 'projects'))
+ // Buscar projetos com paginação e filtros
+async fetchProjects(options?: {
+  status?: ProjectSchema['status'];
+  excludeStatus?: ProjectSchema['status']; // Add excludeStatus
+  limit?: number;
+  page?: number;
+}) {
+  try {
+    let q = query(collection(this.db, 'projects'));
 
-      // Filtros
-      if (options?.status) {
-        q = query(q, where('status', '==', options.status))
-      }
-
-      // Ordenação
-      q = query(q, orderBy('createdAt', 'desc'))
-
-      // Executar consulta
-      const snapshot = await getDocs(q)
-      const allProjects = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as ProjectSchema))
-
-      // Paginação
-      const limit = options?.limit || 10
-      const page = options?.page || 1
-      const startIndex = (page - 1) * limit
-      const endIndex = startIndex + limit
-
-      const paginatedProjects = allProjects.slice(startIndex, endIndex)
-      const totalPages = Math.ceil(allProjects.length / limit)
-
-      return {
-        data: paginatedProjects,
-        totalPages,
-        totalProjects: allProjects.length
-      }
-    } catch (error) {
-      console.error('Erro ao buscar projetos:', error)
-      throw error
+    // Filtros
+    if (options?.status) {
+      q = query(q, where('status', '==', options.status));
     }
+
+    // Exclude status (for "Todos os Status" to exclude "archived")
+    if (options?.excludeStatus) {
+      q = query(q, where('status', '!=', options.excludeStatus)); // Use != for exclusion
+    }
+
+    // Ordenação
+    q = query(q, orderBy('createdAt', 'desc'));
+
+    // Executar consulta
+    const snapshot = await getDocs(q);
+    const allProjects = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as ProjectSchema));
+
+    // Paginação
+    const limit = options?.limit || 10;
+    const page = options?.page || 1;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+
+    const paginatedProjects = allProjects.slice(startIndex, endIndex);
+    const totalPages = Math.ceil(allProjects.length / limit);
+
+    return {
+      data: paginatedProjects,
+      totalPages,
+      totalProjects: allProjects.length
+    };
+  } catch (error) {
+    console.error('Erro ao buscar projetos:', error);
+    throw error;
   }
+}
 
   // Buscar projeto por ID
   async getProjectById(projectId: string): Promise<ProjectSchema> {
@@ -234,6 +240,34 @@ async addProjectMessage(
       throw error
     }
   }
+
+    // Arquivar projeto
+    async archiveProject(projectId: string): Promise<void> {
+        try {
+            const projectRef = doc(this.db, 'projects', projectId);
+            await updateDoc(projectRef, {
+                status: 'archived',
+                updatedAt: Date.now()
+            });
+        } catch (error) {
+            console.error('Error archiving project:', error);
+            throw error;
+        }
+    }
+
+    // Desarquivar projeto
+    async unarchiveProject(projectId: string): Promise<void> {
+        try {
+            const projectRef = doc(this.db, 'projects', projectId);
+            await updateDoc(projectRef, {
+                status: 'planning', // Or any other default status
+                updatedAt: Date.now()
+            });
+        } catch (error) {
+            console.error('Error unarchiving project:', error);
+            throw error;
+        }
+    }
 }
 
 export const projectService = new ProjectService()

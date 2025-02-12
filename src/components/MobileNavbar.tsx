@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, forwardRef } from 'react' // Corrected: Added forwardRef
 import {
   Home,
   Briefcase,
@@ -15,7 +15,8 @@ interface MobileNavbarProps {
     role: Role;
 }
 
-export const MobileNavbar: React.FC<MobileNavbarProps> = ({role}) => { //destructured here
+// Corrected: Wrapped with forwardRef
+export const MobileNavbar = forwardRef<HTMLDivElement, MobileNavbarProps>(({role}, ref) => { //destructured here
   const navigate = useNavigate()
   const { currentUser } = useAuth()
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -108,7 +109,8 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({role}) => { //destruc
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white shadow-2xl border-t z-50 md:hidden h-14"> {/* Added h-14 */}
+    // Added ref here
+    <nav ref={ref} className="fixed bottom-0 left-0 right-0 bg-white shadow-2xl border-t z-50 md:hidden h-14">
       <div className="grid grid-cols-5 py-2">
         {navItems.map((item) => (
           <button
@@ -129,4 +131,4 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({role}) => { //destruc
       </div>
     </nav>
   )
-}
+})

@@ -1,4 +1,4 @@
-import React, { ReactNode, useState, useEffect } from 'react' // Import useState and useEffect
+import React, { ReactNode, useRef } from 'react'
 import { MobileNavbar } from './MobileNavbar'
 import {
   Home,
@@ -9,10 +9,10 @@ import {
   CheckCircle
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom' // Import useLocation
 import { NotificationBell } from './NotificationBell'
 import { LoadingScreen } from './LoadingScreen'
-
+import { getDefaultProfileImage } from '../utils/user'
 
 type Role = 'admin' | 'manager' | 'employee';
 
@@ -57,15 +57,13 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
     }
   }
 
-
-
   return (
     <>
       {/* Desktop Sidebar */}
       <div className="hidden md:block w-64 bg-white border-r shadow-md h-screen fixed left-0 top-0 p-4 flex flex-col">
         <div className="flex items-center mb-8">
           <img
-            src={currentUser?.photoURL || "https://images.unsplash.com/photo-1560179707-f14e90ef3623"}
+            src={currentUser?.photoURL || getDefaultProfileImage(currentUser?.displayName || '')}
             alt="Vem Simbora Logo"
             className="w-12 h-12 rounded-full mr-4 object-cover"
           />
@@ -80,14 +78,14 @@ const Sidebar: React.FC<SidebarProps> = ({ role }) => {
 
         <nav className="flex-1">
           {links.map((link, index) => (
-            <a
+            <Link
               key={index}
-              href={link.href}
+              to={link.href}
               className="flex items-center py-3 px-4 hover:bg-gray-100 rounded-lg transition"
             >
               <link.icon className="mr-3 text-gray-600" size={20} />
               <span className="text-gray-700">{link.label}</span>
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -111,14 +109,21 @@ export const Layout: React.FC<{
   hideNavigation?: boolean;
 }> = ({ children, role = 'employee', isLoading = false, hideNavigation = false }) => {
 
+  const mobileNavbarRef = useRef<HTMLDivElement>(null);
+  const location = useLocation(); // Get current location
+
+  // Check if the current route is the ProjectChat route
+  const isChatRoute = location.pathname.startsWith('/admin/projects/') && location.pathname.endsWith('/chat');
+    const isMobile = window.innerWidth < 768;
 
   return (
     <div className="flex">
       {!hideNavigation && <Sidebar role={role} />}
-      <main className={`${!hideNavigation ? 'md:ml-64' : ''} w-full bg-gray-50 min-h-screen pt-safe-top`}> {/* Removed padding-bottom */}
+      <main className={`${!hideNavigation ? 'md:ml-64' : ''} w-full bg-gray-50 min-h-screen pt-safe-top`}>
         {isLoading ? <LoadingScreen /> : children}
       </main>
-      {!hideNavigation && <MobileNavbar role={role} />}
+      {/* Conditionally render MobileNavbar */}
+      {(!hideNavigation && !isChatRoute && isMobile) && <MobileNavbar ref={mobileNavbarRef} role={role} />}
     </div>
   )
 }

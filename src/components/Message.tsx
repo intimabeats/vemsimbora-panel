@@ -2,6 +2,7 @@ import React from 'react'
 import { Trash2, CornerDownLeft } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { AttachmentDisplay } from './AttachmentDisplay'
+import { getDefaultProfileImage } from '../utils/user' // Import the utility
 
 
 interface MessageProps {
@@ -46,7 +47,7 @@ export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote, is
       } ${isFirstMessage ? 'mt-4' : ''}`} // Add conditional margin-top
     >
       <img
-        src={currentUser?.photoURL || 'https://via.placeholder.com/40'}
+        src={message.userId === currentUser?.uid ? (currentUser?.photoURL || getDefaultProfileImage(currentUser?.displayName || '')) : (getDefaultProfileImage(message.userName || ''))} // Use default image
         alt={message.userName}
         className="w-10 h-10 rounded-full object-cover"
       />

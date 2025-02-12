@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Briefcase,
   X,
-  CheckCircle,
   AlertTriangle
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
@@ -48,9 +47,8 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
       setError(null);
       try {
         const fetchedManagers = await userManagementService.fetchUsers({
-          role: 'manager' // Ensure the role filter is correctly passed
+          role: 'manager'
         });
-        // Map the results to the expected {id, name} format
         const managerList = fetchedManagers.data.map(user => ({
           id: user.id,
           name: user.name
@@ -139,10 +137,10 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
         description: formData.description,
         startDate: formData.startDate
           ? new Date(formData.startDate).getTime()
-          : undefined,
+          : null, // Correct: null if no start date
         endDate: formData.endDate
           ? new Date(formData.endDate).getTime()
-          : undefined,
+          : null, // Correct: null if no end date
         status: formData.status,
         managers: formData.managers
       }
@@ -183,8 +181,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Display general error */}
-          {error ? ( // Corrected: Use ternary
+          {error ? (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center">
               <AlertTriangle className="mr-2" />
               {error}
@@ -285,6 +282,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
                   <option value="paused">Pausado</option>
                   <option value="completed">Concluído</option>
                   <option value="cancelled">Cancelado</option>
+                  <option value="archived">Arquivado</option>
                 </select>
               </div>
 

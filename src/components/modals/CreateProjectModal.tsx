@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Briefcase,
   X,
-  CheckCircle,
   AlertTriangle
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
@@ -128,7 +127,7 @@ useEffect(() => {
       const newProject = await projectService.createProject({
         ...formData,
         startDate: new Date(formData.startDate).getTime(),
-        endDate: formData.endDate ? new Date(formData.endDate).getTime() : undefined,
+        endDate: formData.endDate ? new Date(formData.endDate).getTime() : null,
         managers: formData.managers
       })
 
@@ -263,6 +262,7 @@ useEffect(() => {
                   <option value="paused">Pausado</option>
                   <option value="completed">Concluído</option>
                   <option value="cancelled">Cancelado</option>
+                  <option value="archived">Arquivado</option> {/* Added archived option */}
                 </select>
               </div>
 

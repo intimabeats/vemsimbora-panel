@@ -1,24 +1,22 @@
 import React, { useState, useEffect } from 'react'
 import { Layout } from '../../components/Layout'
 import {
-  Briefcase,
   Plus,
   Edit,
   Trash2,
-  Filter,
   ChevronLeft,
   ChevronRight,
-  Search
+  Search,
+  Archive,
+  FolderOpen
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ProjectSchema } from '../../types/firestore-schema'
 import { projectService } from '../../services/ProjectService'
-import { userManagementService } from '../../services/UserManagementService'
 import { CreateProjectModal } from '../../components/modals/CreateProjectModal'
 import { EditProjectModal } from '../../components/modals/EditProjectModal'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
 
-// Named export
 export const ProjectManagement: React.FC = () => {
   const [projects, setProjects] = useState<ProjectSchema[]>([])
   const [isLoading, setLoading] = useState(true)
@@ -30,7 +28,7 @@ export const ProjectManagement: React.FC = () => {
   // Paginação
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
-  const itemsPerPage = 10
+  const itemsPerPage = 9
 
   // Modais
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -40,23 +38,37 @@ export const ProjectManagement: React.FC = () => {
 
   useEffect(() => {
     fetchProjects()
-  }, [filter, currentPage])
+  }, [filter, currentPage, searchTerm])
 
   const fetchProjects = async () => {
     try {
-      setLoading(true)
-      const fetchedProjects = await projectService.fetchProjects({
-        status: filter.status,
-        limit: itemsPerPage,
-        page: currentPage
-      })
+      setLoading(true);
 
-      setProjects(fetchedProjects.data)
-      setTotalPages(fetchedProjects.totalPages)
+      // Correctly construct the options object
+      const options: {
+        status?: ProjectSchema['status'];
+        excludeStatus?: ProjectSchema['status'];
+        limit: number;
+        page: number;
+      } = {
+        limit: itemsPerPage,
+        page: currentPage,
+      };
+
+      if (filter.status) {
+        options.status = filter.status;
+      } else {
+        options.excludeStatus = 'archived'; // Exclude archived by default
+      }
+
+      const fetchedProjects = await projectService.fetchProjects(options);
+
+      setProjects(fetchedProjects.data);
+      setTotalPages(fetchedProjects.totalPages);
     } catch (error) {
       console.error('Erro ao buscar projetos:', error)
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -65,13 +77,9 @@ export const ProjectManagement: React.FC = () => {
 
     try {
       await projectService.deleteProject(selectedProject.id)
-
-      // Atualizar lista de projetos
       setProjects(prevProjects =>
         prevProjects.filter(project => project.id !== selectedProject.id)
       )
-
-      // Resetar seleção e fechar modal
       setSelectedProject(null)
       setIsDeleteModalOpen(false)
     } catch (error) {
@@ -101,8 +109,30 @@ export const ProjectManagement: React.FC = () => {
     )
   }
 
-  const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleArchiveProject = async (projectId: string) => {
+    try {
+      await projectService.archiveProject(projectId);
+      // Refresh the project list
+      fetchProjects();
+    } catch (error) {
+      console.error('Error archiving project:', error);
+    }
+  };
+
+  const handleUnarchiveProject = async (projectId: string) => {
+    try {
+      await projectService.unarchiveProject(projectId);
+      // Refresh the project list
+      fetchProjects();
+    } catch (error) {
+      console.error('Error unarchiving project:', error);
+    }
+  };
+
+    //search logic
+    const filteredProjects = projects.filter(project =>
+    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    project.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const StatusBadge: React.FC<{ status: ProjectSchema['status'] }> = ({ status }) => {
@@ -111,7 +141,8 @@ export const ProjectManagement: React.FC = () => {
       active: 'bg-green-100 text-green-800',
       completed: 'bg-blue-100 text-blue-800',
       paused: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800'
+      cancelled: 'bg-red-100 text-red-800',
+      archived: 'bg-gray-400 text-white' // Style for archived status
     }
 
     const statusLabels = {
@@ -119,7 +150,8 @@ export const ProjectManagement: React.FC = () => {
       active: 'Ativo',
       completed: 'Concluído',
       paused: 'Pausado',
-      cancelled: 'Cancelado'
+      cancelled: 'Cancelado',
+      archived: 'Arquivado' // Label for archived status
     }
 
     return (
@@ -134,9 +166,14 @@ export const ProjectManagement: React.FC = () => {
       <div className="container mx-auto p-6">
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center">
-              <Briefcase className="mr-4 text-blue-600" /> Gerenciamento de Projetos
-            </h1>
+          <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
+                Gerenciamento de Projetos
+              </h1>
+              <p className="text-gray-500 text-sm">
+                Gerencie e acompanhe todos os projetos do sistema.
+              </p>
+            </div>
             <button
               onClick={() => setIsCreateModalOpen(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition"
@@ -145,9 +182,9 @@ export const ProjectManagement: React.FC = () => {
             </button>
           </div>
 
-          {/* Filtros */}
-          <div className="flex space-x-4 mb-6">
-            <div className="relative flex-grow">
+          {/* Filtros - Responsive Layout */}
+          <div className="md:flex md:space-x-4 mb-6">
+            <div className="relative flex-grow mb-4 md:mb-0">
               <input
                 type="text"
                 placeholder="Buscar projetos..."
@@ -160,10 +197,8 @@ export const ProjectManagement: React.FC = () => {
 
             <select
               value={filter.status || ''}
-              onChange={(e) => setFilter({
-                status: e.target.value as ProjectSchema['status']
-              })}
-              className="px-4 py-2 border rounded-lg"
+              onChange={(e) => setFilter({ ...filter, status: e.target.value as ProjectSchema['status'] })}
+              className="w-full md:w-auto px-4 py-2 border rounded-lg"
             >
               <option value="">Todos os Status</option>
               <option value="planning">Planejamento</option>
@@ -171,73 +206,72 @@ export const ProjectManagement: React.FC = () => {
               <option value="completed">Concluídos</option>
               <option value="paused">Pausados</option>
               <option value="cancelled">Cancelados</option>
+              <option value="archived">Arquivados</option>
             </select>
           </div>
 
-          {/* Tabela de Projetos */}
-          <div className="bg-white rounded-xl shadow-md overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datas</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProjects.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-4">
-                      Nenhum projeto encontrado
-                    </td>
-                  </tr>
-                ) : (
-                  filteredProjects.map((project) => (
-                    <tr key={project.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          to={`/admin/projects/${project.id}`}
-                          className="text-blue-600 hover:underline"
+          {/* Project Cards (Grid Layout) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProjects.length === 0 ? (
+              <div className="text-center py-4 col-span-full">
+                Nenhum projeto encontrado
+              </div>
+            ) : (
+              filteredProjects.map((project) => (
+                <div key={project.id} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition group">
+                  <div className="flex justify-between items-start mb-4">
+                    <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition">
+                      <Link to={`/admin/projects/${project.id}`}>{project.name}</Link>
+                    </h2>
+                    <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {project.status === 'archived' ? (
+                        <button
+                          onClick={() => handleUnarchiveProject(project.id)}
+                          className="text-green-500 hover:text-green-700"
+                          title="Desarquivar"
                         >
-                          {project.name}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 truncate max-w-xs">{project.description}</td>
-                      <td className="px-6 py-4">
-                        <StatusBadge status={project.status} />
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        Início: {new Date(project.startDate).toLocaleDateString()}
-                        {project.endDate && (
-                          <>
-                            <br />
-                            Fim: {new Date(project.endDate).toLocaleDateString()}
-                          </>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={() => handleEditProject(project)}
-                            className="text-blue-500 hover:text-blue-700"
-                          >
-                            <Edit size={20} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteConfirmation(project)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={20} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                          <FolderOpen size={20} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleArchiveProject(project.id)}
+                          className="text-yellow-500 hover:text-yellow-700"
+                          title="Arquivar"
+                        >
+                          <Archive size={20} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleEditProject(project)}
+                        className="text-blue-500 hover:text-blue-700"
+                      >
+                        <Edit size={20} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteConfirmation(project)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 mb-4 line-clamp-2">{project.description}</p>
+                  <div className="text-sm text-gray-600 mb-2">
+                    Início: {new Date(project.startDate).toLocaleDateString()}
+                    {project.endDate && (
+                      <>
+                        <br />
+                        Fim: {new Date(project.endDate).toLocaleDateString()}
+                      </>
+                    )}
+                  </div>
+                   {/* Status Badge - Bottom Right */}
+                  <div className="flex justify-end">
+                    <StatusBadge status={project.status} />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Paginação */}
@@ -294,5 +328,4 @@ export const ProjectManagement: React.FC = () => {
   )
 }
 
-// Default export for compatibility
 export default ProjectManagement
