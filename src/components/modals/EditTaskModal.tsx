@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react'
 import {
   CheckCircle,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Plus,
+  Trash2
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
 import { userManagementService } from '../../services/UserManagementService'
-import { TaskSchema } from '../../types/firestore-schema'
+import { TaskSchema, TaskAction } from '../../types/firestore-schema'
 import { systemSettingsService } from '../../services/SystemSettingsService'
+import { actionTemplateService } from '../../services/ActionTemplateService'; // Import
 
 interface EditTaskModalProps {
   task: TaskSchema
@@ -31,7 +34,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     assignedTo: task.assignedTo,
     priority: task.priority,
     dueDate: new Date(task.dueDate).toISOString().split('T')[0],
-    difficultyLevel: task.difficultyLevel || 5
+    difficultyLevel: task.difficultyLevel || 5,
+    actions: task.actions || []  // Initialize actions
   })
 
   // UI state
@@ -44,6 +48,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
   const [projects, setProjects] = useState<{ id: string, name: string }[]>([])
   const [users, setUsers] = useState<{ id: string, name: string }[]>([])
   const [coinsReward, setCoinsReward] = useState(task.coinsReward || 0)
+  const [templates, setTemplates] = useState<{ id: string, title: string }[]>([]); // State for templates
+  const [selectedTemplate, setSelectedTemplate] = useState(''); // State for selected template
 
   // Reset form when task changes
   useEffect(() => {
@@ -55,28 +61,32 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
         assignedTo: task.assignedTo,
         priority: task.priority,
         dueDate: new Date(task.dueDate).toISOString().split('T')[0],
-        difficultyLevel: task.difficultyLevel || 5
+        difficultyLevel: task.difficultyLevel || 5,
+        actions: task.actions || [] // Ensure actions is initialized
       })
       setStep(1)
       setError(null)
       setFormErrors({})
+      setSelectedTemplate('');
     }
   }, [task, isOpen])
 
-  // Load initial data
+  // Load initial data (projects, users, settings, templates)
   useEffect(() => {
     if (isOpen) {
       const loadData = async () => {
         try {
-          const [projectsRes, usersRes, settings] = await Promise.all([
+          const [projectsRes, usersRes, settings, templatesRes] = await Promise.all([
             projectService.fetchProjects(),
             userManagementService.fetchUsers(),
-            systemSettingsService.getSettings()
+            systemSettingsService.getSettings(),
+            actionTemplateService.fetchActionTemplates() // Fetch templates
           ])
 
           setProjects(projectsRes.data.map(p => ({ id: p.id, name: p.name })))
           setUsers(usersRes.data.map(u => ({ id: u.id, name: u.name })))
           setCoinsReward(Math.round(settings.taskCompletionBase * formData.difficultyLevel * settings.complexityMultiplier))
+          setTemplates(templatesRes.map(t => ({ id: t.id, title: t.title }))); // Set templates
         } catch (err) {
           setError('Failed to load data')
         }
@@ -84,9 +94,9 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
       loadData()
     }
-  }, [isOpen])
+  }, [isOpen, formData.difficultyLevel]) // Include formData.difficultyLevel in dependencies
 
-  // Form validation
+  // Form validation (Step 1)
   const validateStep1 = () => {
     const errors: { [key: string]: string } = {}
     if (!formData.title.trim()) errors.title = 'Title is required'
@@ -98,6 +108,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     return Object.keys(errors).length === 0
   }
 
+  // Form validation (Step 2)
   const validateStep2 = () => {
     const errors: { [key: string]: string } = {}
     if (!formData.dueDate) errors.dueDate = 'Due date is required'
@@ -125,6 +136,48 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     }
   }
 
+    // Handle changes within an action (title, data, etc.)
+    const handleActionChange = (index: number, field: keyof TaskAction, value: any) => {
+        setFormData(prev => {
+            const newActions = [...prev.actions];
+            newActions[index] = { ...newActions[index], [field]: value };
+            return { ...prev, actions: newActions };
+        });
+    };
+
+    // Handle removing an action
+    const handleRemoveAction = (index: number) => {
+        setFormData(prev => ({
+            ...prev,
+            actions: prev.actions.filter((_, i) => i !== index)
+        }));
+    };
+
+  const handleAddActionFromTemplate = async () => {
+    if (!selectedTemplate) return;
+
+    try {
+      const fullTemplate = await actionTemplateService.getActionTemplateById(selectedTemplate);
+      if (!fullTemplate) return;
+
+      // Deep copy and add new IDs
+      const newActions: TaskAction[] = JSON.parse(JSON.stringify(fullTemplate.elements)).map((action: TaskAction) => ({
+        ...action,
+        id: Date.now().toString() + Math.random().toString(36).substring(7), // New unique ID
+        completed: false,
+        completedAt: null,
+      }));
+
+      setFormData(prev => ({
+        ...prev,
+        actions: [...prev.actions, ...newActions],
+      }));
+    } catch (error) {
+      console.error("Error adding action from template:", error);
+      setError("Failed to add action from template.");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateStep2()) return
@@ -141,6 +194,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
       await taskService.updateTask(task.id, updateData)
       onTaskUpdated({ ...task, ...updateData })
+      onClose() // Close modal on success
     } catch (err: any) {
       setError(err.message || 'Failed to update task')
     } finally {
@@ -185,9 +239,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   name="title"
                   value={formData.title}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.title ? 'border-red-500' : 'focus:ring-blue-500'
-                  }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.title ? 'border-red-500' : 'focus:ring-blue-500'
+                    }`}
                 />
                 {formErrors.title && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.title}</p>
@@ -202,9 +255,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${
-                    formErrors.description ? 'border-red-500' : 'focus:ring-blue-500'
-                  }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.description ? 'border-red-500' : 'focus:ring-blue-500'
+                    }`}
                 />
                 {formErrors.description && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.description}</p>
@@ -219,9 +271,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   name="projectId"
                   value={formData.projectId}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.projectId ? 'border-red-500' : 'focus:ring-blue-500'
-                  }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.projectId ? 'border-red-500' : 'focus:ring-blue-500'
+                    }`}
                 >
                   <option value="">Select Project</option>
                   {projects.map(project => (
@@ -244,9 +295,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   name="assignedTo"
                   value={formData.assignedTo}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${
-                    formErrors.assignedTo ? 'border-red-500' : 'focus:ring-blue-500'
-                  }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.assignedTo ? 'border-red-500' : 'focus:ring-blue-500'
+                    }`}
                 >
                   {users.map(user => (
                     <option key={user.id} value={user.id}>
@@ -283,11 +333,10 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                       key={level}
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, difficultyLevel: level }))}
-                      className={`px-3 py-1 rounded-full text-sm ${
-                        formData.difficultyLevel === level
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
+                      className={`px-3 py-1 rounded-full text-sm ${formData.difficultyLevel === level
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
                     >
                       {level}
                     </button>
@@ -304,13 +353,66 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                   name="dueDate"
                   value={formData.dueDate}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
-                    formErrors.dueDate ? 'border-red-500' : 'focus:ring-blue-500'
-                  }`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dueDate ? 'border-red-500' : 'focus:ring-blue-500'
+                    }`}
                 />
                 {formErrors.dueDate && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.dueDate}</p>
                 )}
+              </div>
+
+              {/* Action Templates */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Add Action from Template
+                </label>
+                <div className="flex space-x-2">
+                  <select
+                    value={selectedTemplate}
+                    onChange={(e) => setSelectedTemplate(e.target.value)}
+                    className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Template</option>
+                    {templates.map(template => (
+                      <option key={template.id} value={template.id}>
+                        {template.title}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleAddActionFromTemplate}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                    disabled={!selectedTemplate}
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Display Added Actions */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Actions
+                </label>
+                <div className="space-y-2">
+                  {formData.actions.map((action, index) => (
+                    <div key={action.id} className="border rounded-lg p-2 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">{action.title}</h4>
+                        <p className="text-sm text-gray-500">{action.type}</p>
+                        {/* You can add more UI here to display/edit action details based on type */}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAction(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="flex space-x-4">
@@ -324,9 +426,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`w-full py-2 rounded-lg text-white transition ${
-                    loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
+                  className={`w-full py-2 rounded-lg text-white transition ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                    }`}
                 >
                   {loading ? 'Updating...' : 'Update Task'}
                 </button>

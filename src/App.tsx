@@ -1,152 +1,195 @@
 // src/App.tsx
-import React from 'react'
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate
-} from 'react-router-dom'
-import * as Sentry from "@sentry/react"
-import { AuthProvider } from './context/AuthContext'
-import { PrivateRoute } from './components/PrivateRoute'
-import { ErrorBoundary } from './components/ErrorBoundary'
+    import React from 'react'
+    import {
+      BrowserRouter as Router,
+      Routes,
+      Route,
+      Navigate
+    } from 'react-router-dom'
+    import * as Sentry from "@sentry/react"
+    import { AuthProvider } from './context/AuthContext'
+    import { PrivateRoute } from './components/PrivateRoute'
+    import { ErrorBoundary } from './components/ErrorBoundary'
 
-// Importações de páginas
-import { Login } from './pages/auth/Login'
-import { ForgotPassword } from './pages/auth/ForgotPassword'
-import { Profile } from './pages/Profile'
-import { Unauthorized } from './pages/Unauthorized'
+    // Importações de páginas
+    import { Login } from './pages/auth/Login'
+    import { ForgotPassword } from './pages/auth/ForgotPassword'
+    import { Profile } from './pages/Profile'
+    import { Unauthorized } from './pages/Unauthorized'
+    import { Notifications } from './pages/Notifications'
+    import { TaskDetails } from './pages/admin/TaskDetails'
+    import { CreateActionTemplate } from './pages/admin/CreateActionTemplate' // Import
+    import { ActionTemplateManagement } from './pages/admin/ActionTemplateManagement' // Import
 
-// Admin Imports
-import { AdminDashboard } from './pages/admin/Dashboard'
-import { UserManagement } from './pages/admin/UserManagement'
-import { ProjectManagement } from './pages/admin/ProjectManagement'
-import { ProjectDetails } from './pages/admin/ProjectDetails'
-import { ProjectChat } from './pages/admin/ProjectChat'
-import { TaskManagement } from './pages/admin/TaskManagement'
-import { SystemSettings } from './pages/admin/SystemSettings'
 
-// Manager Imports
-import { ManagerDashboard } from './pages/manager/Dashboard'
+    // Admin Imports
+    import { AdminDashboard } from './pages/admin/Dashboard'
+    import { UserManagement } from './pages/admin/UserManagement'
+    import { ProjectManagement } from './pages/admin/ProjectManagement'
+    import { ProjectDetails } from './pages/admin/ProjectDetails'
+    import { ProjectChat } from './pages/admin/ProjectChat'
+    import { TaskManagement } from './pages/admin/TaskManagement'
+    import { SystemSettings } from './pages/admin/SystemSettings'
 
-// Employee Imports
-import { EmployeeDashboard } from './pages/employee/Dashboard'
+    // Manager Imports
+    import { ManagerDashboard } from './pages/manager/Dashboard'
 
-const App: React.FC = () => {
-  return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <Router>
-          <Routes>
-            {/* Rotas de Autenticação */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
+    // Employee Imports
+    import { EmployeeDashboard } from './pages/employee/Dashboard'
 
-            {/* Rotas de Perfil */}
-            <Route
-              path="/profile"
-              element={
-                <PrivateRoute>
-                  <Profile />
-                </PrivateRoute>
-              }
-            />
+    const App: React.FC = () => {
+      return (
+        <ErrorBoundary>
+          <AuthProvider>
+            <Router>
+              <Routes>
+                {/* Rotas de Autenticação */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Rotas de Admin */}
-            <Route
-              path="/admin/dashboard"
-              element={
-                <PrivateRoute allowedRoles={['admin']}>
-                  <AdminDashboard />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/admin/user-management"
-              element={
-                <PrivateRoute allowedRoles={['admin']}>
-                  <UserManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/admin/projects"
-              element={
-                <PrivateRoute allowedRoles={['admin']}>
-                  <ProjectManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/admin/projects/:projectId"
-              element={
-                <PrivateRoute allowedRoles={['admin', 'manager']}>
-                  <ProjectDetails />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/admin/projects/:projectId/chat"
-              element={
-                <PrivateRoute allowedRoles={['admin', 'manager']}>
-                  <ProjectChat />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/admin/tasks"
-              element={
-                <PrivateRoute allowedRoles={['admin']}>
-                  <TaskManagement />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/admin/settings"
-              element={
-                <PrivateRoute allowedRoles={['admin']}>
-                  <SystemSettings />
-                </PrivateRoute>
-              }
-            />
+                {/* Rotas de Perfil */}
+                <Route
+                  path="/profile"
+                  element={
+                    <PrivateRoute>
+                      <Profile />
+                    </PrivateRoute>
+                  }
+                />
 
-            {/* Rotas de Manager */}
-            <Route
-              path="/manager/dashboard"
-              element={
-                <PrivateRoute allowedRoles={['manager']}>
-                  <ManagerDashboard />
-                </PrivateRoute>
-              }
-            />
+                {/* Rota de Notificações */}
+                <Route
+                  path="/notifications"
+                  element={
+                    <PrivateRoute>
+                      <Notifications />
+                    </PrivateRoute>
+                  }
+                />
 
-            {/* Rotas de Employee */}
-            <Route
-              path="/employee/dashboard"
-              element={
-                <PrivateRoute allowedRoles={['employee']}>
-                  <EmployeeDashboard />
-                </PrivateRoute>
-              }
-            />
+                {/* Task Details Route */}
+                <Route
+                  path="/tasks/:taskId"
+                  element={
+                    <PrivateRoute>
+                      <TaskDetails />
+                    </PrivateRoute>
+                  }
+                />
 
-            {/* Rota Padrão */}
-            <Route
-              path="/"
-              element={<Navigate to="/login" replace />}
-            />
+                {/* Rotas de Admin */}
+                <Route
+                  path="/admin/dashboard"
+                  element={
+                    <PrivateRoute allowedRoles={['admin']}>
+                      <AdminDashboard />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/user-management"
+                  element={
+                    <PrivateRoute allowedRoles={['admin']}>
+                      <UserManagement />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/projects"
+                  element={
+                    <PrivateRoute allowedRoles={['admin']}>
+                      <ProjectManagement />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/projects/:projectId"
+                  element={
+                    <PrivateRoute allowedRoles={['admin', 'manager']}>
+                      <ProjectDetails />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/projects/:projectId/chat"
+                  element={
+                    <PrivateRoute allowedRoles={['admin', 'manager']}>
+                      <ProjectChat />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/tasks"
+                  element={
+                    <PrivateRoute allowedRoles={['admin']}>
+                      <TaskManagement />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/settings"
+                  element={
+                    <PrivateRoute allowedRoles={['admin']}>
+                      <SystemSettings />
+                    </PrivateRoute>
+                  }
+                />
+                {/* NEW: Action Template Routes */}
+                <Route
+                  path="/admin/action-templates/create"
+                  element={
+                    <PrivateRoute allowedRoles={['admin']}>
+                      <CreateActionTemplate />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/admin/action-templates"
+                  element={
+                    <PrivateRoute allowedRoles={['admin']}>
+                      <ActionTemplateManagement />
+                    </PrivateRoute>
+                  }
+                />
 
-            {/* 404 Not Found */}
-            <Route
-              path="*"
-              element={<div>Página não encontrada</div>}
-            />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </ErrorBoundary>
-  )
-}
 
-export default Sentry.withProfiler(App)
+                {/* Rotas de Manager */}
+                <Route
+                  path="/manager/dashboard"
+                  element={
+                    <PrivateRoute allowedRoles={['manager']}>
+                      <ManagerDashboard />
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Rotas de Employee */}
+                <Route
+                  path="/employee/dashboard"
+                  element={
+                    <PrivateRoute allowedRoles={['employee']}>
+                      <EmployeeDashboard />
+                    </PrivateRoute>
+                  }
+                />
+
+                {/* Rota Padrão */}
+                <Route
+                  path="/"
+                  element={<Navigate to="/login" replace />}
+                />
+
+                {/* 404 Not Found */}
+                <Route
+                  path="*"
+                  element={<div>Página não encontrada</div>}
+                />
+              </Routes>
+            </Router>
+          </AuthProvider>
+        </ErrorBoundary>
+      )
+    }
+
+    export default Sentry.withProfiler(App)

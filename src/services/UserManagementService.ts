@@ -1,4 +1,4 @@
-  // src/services/UserManagementService.ts
+// src/services/UserManagementService.ts
   import {
     getFirestore,
     collection,

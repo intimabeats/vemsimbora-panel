@@ -1,123 +1,142 @@
 // User Schema
-export interface UserSchema {
-  id: string
-  name: string
-  email: string
-  role: 'admin' | 'manager' | 'employee'
-  status: 'active' | 'inactive' | 'suspended'
-  coins: number
-  createdAt: number
-  updatedAt: number
-  profileImage?: string
-  lastLogin?: number
-}
-
-// Project Schema
-export interface ProjectSchema {
-  id: string
-  name: string
-  description: string
-  startDate: number
-  endDate?: number
-  status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived' // Added 'archived'
-  managers: string[]
-  createdBy: string
-  createdAt: number
-  updatedAt: number
-  messages?: {
-    id: string
-    userId: string
-    userName: string
-    content: string
-    timestamp: number
-    attachments?: {
+    export interface UserSchema {
       id: string
       name: string
-      url: string
-      type: 'image' | 'video' | 'document' | 'link' | 'other'
-      size?: number
-    }[]
-  }[]
-}
+      email: string
+      role: 'admin' | 'manager' | 'employee'
+      status: 'active' | 'inactive' | 'suspended'
+      coins: number
+      createdAt: number
+      updatedAt: number
+      profileImage?: string
+      lastLogin?: number
+    }
 
-// Task Schema
-export interface TaskSchema {
-  id: string
-  projectId: string
-  title: string
-  description: string
-  status: 'pending' | 'in_progress' | 'waiting_approval' | 'completed' | 'blocked'
-  priority: 'low' | 'medium' | 'high' | 'critical'
-  assignedTo: string[] // User IDs
-  createdBy: string // User ID
-  startDate?: number
-  dueDate: number
-  completedAt?: number
-  difficultyLevel: number // Difficulty level 0-10
-  coinsReward: number // Calculated reward
-  subtasks?: {
-    id: string
-    title: string
-    completed: boolean
-    completedAt?: number
-  }[]
-  comments?: {
-    id: string
-    userId: string
-    text: string
-    createdAt: number
-    attachments?: string[] // URLs or file references
-  }[]
-  attachments?: string[] // URLs or file references
-  createdAt: number
-  updatedAt: number
-}
+    // Project Schema
+    export interface ProjectSchema {
+      id: string
+      name: string
+      description: string
+      startDate: number
+      endDate?: number
+      status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived' // Added 'archived'
+      managers: string[]
+      createdBy: string
+      createdAt: number
+      updatedAt: number
+      messages?: {
+        id: string
+        userId: string
+        userName: string
+        content: string
+        timestamp: number
+        attachments?: {
+          id: string
+          name: string
+          url: string
+          type: 'image' | 'video' | 'document' | 'link' | 'other'
+          size?: number
+        }[]
+      }[]
+    }
 
-// Reward Schema
-export interface RewardSchema {
-  id: string
-  userId: string
-  type: 'task_completion' | 'monthly_bonus' | 'special_achievement'
-  amount: number
-  description: string
-  timestamp: number
-  projectId?: string
-  taskId?: string
-}
+    // Task Schema
+    export interface TaskSchema {
+      id: string
+      projectId: string
+      title: string
+      description: string
+      status: 'pending' | 'in_progress' | 'waiting_approval' | 'completed' | 'blocked'
+      priority: 'low' | 'medium' | 'high' | 'critical'
+      assignedTo: string[] // User IDs
+      createdBy: string // User ID
+      startDate?: number
+      dueDate: number
+      completedAt?: number
+      difficultyLevel: number // Difficulty level 0-10
+      coinsReward: number // Calculated reward
+      subtasks?: {
+        id: string
+        title: string
+        completed: boolean
+        completedAt?: number
+      }[]
+      comments?: {
+        id: string
+        userId: string
+        text: string
+        createdAt: number
+        attachments?: string[] // URLs or file references
+      }[]
+      attachments?: string[] // URLs or file references
+      createdAt: number
+      updatedAt: number
+      actions: TaskAction[]; // NEW: Array of actions
+    }
 
-// Notification Schema
-export interface NotificationSchema {
-  id: string
-  userId: string
-  type: 'task_created' | 'task_assigned' | 'task_completed' | 'project_update' | 'reward_earned' | 'system_alert'
-  title: string
-  message: string
-  read: boolean
-  timestamp: number
-  relatedEntityId?: string
-  sender?: string
-}
+    //  Interface for a task action
+    export interface TaskAction {
+      id: string;
+      title: string;
+      type: 'text' | 'file_upload' | 'approval' | 'date'; // Expand as needed
+      completed: boolean;
+      completedAt?: number | null;
+      data?: any; // For storing action-specific data (e.g., file URL)
+    }
 
-// System Settings Schema
-export interface SystemSettingsSchema {
-  taskCompletionBase: number
-  complexityMultiplier: number
-  monthlyBonus: number
-  twoFactorAuth: boolean
-  passwordResetFrequency: number
-  emailNotifications: boolean
-  pushNotifications: boolean
-  weeklyReports: boolean
-}
+    //NEW: Interface for a task action template
+    export interface ActionTemplateSchema {
+        id: string;
+        title: string;
+        type: 'text' | 'file_upload' | 'approval' | 'date';
+        data?: any; // For default data, instructions, etc.
+    }
 
-// Activity Log Schema
-export interface ActivityLogSchema {
-    id: string;
-    userId: string;
-    userName: string;
-    type: 'project_created' | 'project_updated' | 'task_created' | 'task_updated' | 'task_completed' | 'user_login' | 'user_created' | 'other'; // Add other types as needed
-    projectId?: string; // Optional, if related to a project
-    taskId?: string;    // Optional, if related to a task
-    details?: string;   // Optional, for additional details
-    timestamp: number;
-  }
+    // Reward Schema
+    export interface RewardSchema {
+      id: string
+      userId: string
+      type: 'task_completion' | 'monthly_bonus' | 'special_achievement'
+      amount: number
+      description: string
+      timestamp: number
+      projectId?: string
+      taskId?: string
+    }
+
+    // Notification Schema
+    export interface NotificationSchema {
+      id: string
+      userId: string
+      type: 'task_created' | 'task_assigned' | 'task_completed' | 'project_update' | 'reward_earned' | 'system_alert' | 'task_updated'
+      title: string
+      message: string
+      read: boolean
+      timestamp: number
+      relatedEntityId?: string
+      sender?: string
+    }
+
+    // System Settings Schema
+    export interface SystemSettingsSchema {
+      taskCompletionBase: number
+      complexityMultiplier: number
+      monthlyBonus: number
+      twoFactorAuth: boolean
+      passwordResetFrequency: number
+      emailNotifications: boolean
+      pushNotifications: boolean
+      weeklyReports: boolean
+    }
+
+    // Activity Log Schema
+    export interface ActivityLogSchema {
+      id: string;
+      userId: string;
+      userName: string;
+      type: 'project_created' | 'project_updated' | 'task_created' | 'task_updated' | 'task_completed' | 'user_login' | 'user_created' | 'other'; // Add other types as needed
+      projectId?: string; // Optional, if related to a project
+      taskId?: string;    // Optional, if related to a task
+      details?: string;   // Optional, for additional details
+      timestamp: number;
+    }
