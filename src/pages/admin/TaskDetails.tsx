@@ -1,11 +1,12 @@
-
-    import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
     import { useParams, useNavigate, Link } from 'react-router-dom';
     import { Layout } from '../../components/Layout';
     import { taskService } from '../../services/TaskService';
-    import { projectService } from '../../services/ProjectService'; // Import ProjectService
-    import { userManagementService } from '../../services/UserManagementService'; // Import UserManagementService
-    import { TaskSchema, TaskAction } from '../../types/firestore-schema'; // Import TaskAction
+    import { projectService } from '../../services/ProjectService';
+    import { userManagementService } from '../../services/UserManagementService';
+    import { TaskSchema, TaskAction } from '../../types/firestore-schema';
+    import { ActionView } from '../../components/ActionView'; // Import ActionView
+    import Confetti from 'react-confetti'; // Correct import
     import {
       CheckCircle,
       XCircle,
@@ -16,8 +17,11 @@
       User,
       Calendar,
       Check,
-      X
+      X,
+      FileText
     } from 'lucide-react';
+    import { pulseKeyframes } from '../../utils/animation';
+
 
     export const TaskDetails: React.FC = () => {
       const { taskId } = useParams<{ taskId: string }>();
@@ -27,6 +31,10 @@
       const [users, setUsers] = useState<{ [key: string]: { name: string; profileImage?: string } }>({});
       const [isLoading, setIsLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
+      const [selectedAction, setSelectedAction] = useState<TaskAction | null>(null); // Track selected action
+      const [statusChanged, setStatusChanged] = useState(false); // Track status changes
+      const [showConfetti, setShowConfetti] = useState(false); // Control confetti visibility
+
 
       useEffect(() => {
         const loadTask = async () => {
@@ -69,7 +77,20 @@
           await taskService.completeTaskAction(taskId!, actionId, data);
           // Refresh task data
           const updatedTask = await taskService.getTaskById(taskId!);
-          setTask(updatedTask);
+
+
+          // Check for 100% completion and update status *before* updating local state
+          const completedActions = updatedTask.actions.filter(action => action.completed).length;
+          const totalActions = updatedTask.actions.length;
+          const newProgress = totalActions > 0 ? (completedActions / totalActions) * 100 : 0;
+          if (newProgress === 100 && updatedTask.status !== 'completed') {
+            await taskService.updateTask(taskId!, { status: 'completed' }); // Await the status update
+            setStatusChanged(true); // Trigger pulse animation
+            setShowConfetti(true);   // Show confetti
+            setTimeout(() => setStatusChanged(false), 1000); // Reset after 1 second
+          }
+          setTask(updatedTask); // Now update the local state
+          setSelectedAction(null); // Close the action view after completion
         } catch (error) {
           console.error('Error completing action:', error);
         }
@@ -119,13 +140,15 @@
         );
       }
 
-      const completedActions = task.actions.filter(action => action.completed).length;
-      const totalActions = task.actions.length;
+      const completedActions = task.actions?.filter(action => action.completed).length ?? 0;
+      const totalActions = task.actions?.length ?? 0;
       const progress = totalActions > 0 ? (completedActions / totalActions) * 100 : 0;
 
       return (
         <Layout role="admin">
+          <style>{pulseKeyframes}</style>
           <div className="container mx-auto p-6">
+            {showConfetti && <Confetti onConfettiComplete={() => setShowConfetti(false)} />} {/* Conditionally render and control with onConfettiComplete */}
             <div className="bg-white rounded-xl shadow-md p-6">
               <div className="flex justify-between items-center mb-4">
                 <div>
@@ -138,7 +161,7 @@
                   className={`px-2 py-1 rounded-full text-xs font-medium ${task.status === 'completed'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-yellow-100 text-yellow-800'
-                    }`}
+                    } ${statusChanged ? 'animate-pulse' : ''}`}
                 >
                   {task.status === 'completed' ? 'Concluída' : 'Em Andamento'}
                 </span>
@@ -188,75 +211,62 @@
                   />
                 </div>
               </div>
-
-              <div className="mt-8">
-                <h2 className="text-xl font-semibold mb-4">Ações</h2>
-                <div className="space-y-4">
-                  {task.actions.map((action) => (
-                    <div key={action.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-medium text-gray-900">{action.title}</h3>
-                        <button
-                          onClick={() =>
-                            action.completed
-                              ? handleActionUncomplete(action.id)
-                              : handleActionComplete(action.id)
-                          }
-                          className={`w-6 h-6 rounded-full flex items-center justify-center ${action.completed ? 'bg-green-500' : 'bg-gray-200'
-                            }`}
-                        >
-                          {action.completed ? (
-                            <Check className="text-white" size={16} />
-                          ) : (
-                            <X className="text-gray-700" size={16} />
-                          )}
-                        </button>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {/* Display different inputs based on action type */}
-                        {action.type === 'text' && (
-                          <input
-                            type="text"
-                            placeholder="Digite o texto"
-                            value={action.data || ''}
-                            onChange={(e) => handleActionComplete(action.id, e.target.value)}
-                            disabled={action.completed}
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
-                          />
-                        )}
-                        {action.type === 'file_upload' && (
-                          <div>
-                            <input
-                              type="file"
-                              onChange={(e) => {
-                                if (e.target.files && e.target.files[0]) {
-                                  handleFileUpload(action.id, e.target.files[0]);
-                                }
-                              }}
-                              disabled={action.completed}
-                            />
-                            {action.data?.fileUrl && (
-                              <a
-                                href={action.data.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
+              {selectedAction ? (
+                <ActionView
+                  action={selectedAction}
+                  onComplete={handleActionComplete}
+                  onCancel={() => setSelectedAction(null)}
+                  taskId={taskId!}
+                />
+              ) : (
+                <div className="mt-8">
+                  <h2 className="text-xl font-semibold mb-4">Ações</h2>
+                  <div className="space-y-4">
+                    {task.actions?.map((action) => ( // Use optional chaining
+                      <div key={action.id} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-medium text-gray-900">{action.title}</h3>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() =>
+                                action.completed
+                                  ? handleActionUncomplete(action.id)
+                                  : setSelectedAction(action) // Set selected action
+                              }
+                              className={`w-6 h-6 rounded-full flex items-center justify-center ${action.completed ? 'bg-green-500' : 'bg-gray-200'
+                                }`}
+                            >
+                              {action.completed ? (
+                                <Check className="text-white" size={16} />
+                              ) : (
+                                <X className="text-gray-700" size={16} />
+                              )}
+                            </button>
+                            {!action.completed && (
+                              <button
+                                onClick={() => setSelectedAction(action)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                               >
-                                Ver Arquivo
-                              </a>
+                                Perform Action
+                              </button>
                             )}
                           </div>
-                        )}
-                        {action.type === 'approval' && (
-                          <div className='flex'>
-                            <span>Aprovação pendente</span>
-                            {/* Add logic for approval (e.g., by admin/manager) */}
-                          </div>
-                        )}
-                        {action.type === 'date' && (
-                          <input
-                            type='date'
-                            value={action.data || ''}
-                            onChange={(e) => handleActionComplete(action.id, e.target.value)}
-                            disabled={action.completed}
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-3
+
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          {/* Display action type and any existing data */}
+                          <p>Type: {action.type}</p>
+                          {action.data && (
+                            <p>Data: {JSON.stringify(action.data)}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Layout>
+      )
+    }
