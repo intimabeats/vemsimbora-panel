@@ -8,10 +8,10 @@ import {
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
-import { userManagementService } from '../../services/UserManagementService'
+import { userManagementService } from '../../services/UserManagementService' // Corrected import
 import { TaskSchema, TaskAction } from '../../types/firestore-schema'
 import { systemSettingsService } from '../../services/SystemSettingsService'
-import { actionTemplateService } from '../../services/ActionTemplateService'; // Import
+import { actionTemplateService } from '../../services/ActionTemplateService';
 
 interface EditTaskModalProps {
   task: TaskSchema
@@ -136,7 +136,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     }
   }
 
-    // Handle changes within an action (title, data, etc.)
+    // Handle changes within an action (title, description, etc.)
     const handleActionChange = (index: number, field: keyof TaskAction, value: any) => {
         setFormData(prev => {
             const newActions = [...prev.actions];
@@ -160,7 +160,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
       const fullTemplate = await actionTemplateService.getActionTemplateById(selectedTemplate);
       if (!fullTemplate) return;
 
-      // Deep copy and add new IDs
+      // Deep copy and add new IDs, including description
       const newActions: TaskAction[] = JSON.parse(JSON.stringify(fullTemplate.elements)).map((action: TaskAction) => ({
         ...action,
         id: Date.now().toString() + Math.random().toString(36).substring(7), // New unique ID
@@ -397,11 +397,23 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 </label>
                 <div className="space-y-2">
                   {formData.actions.map((action, index) => (
-                    <div key={action.id} className="border rounded-lg p-2 flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium text-gray-900">{action.title}</h4>
-                        <p className="text-sm text-gray-500">{action.type}</p>
-                        {/* You can add more UI here to display/edit action details based on type */}
+                    <div key={action.id} className="border rounded-lg p-4 flex items-center justify-between">
+                    <div>
+                        {/* Action Title */}
+                        <input
+                          type="text"
+                          value={action.title}
+                          onChange={(e) => handleActionChange(index, 'title', e.target.value)}
+                          placeholder={`Enter ${action.type} title`}
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 mb-2"
+                        />
+                        {/* Action Description */}
+                        <textarea
+                          value={action.description || ''}  // Use the description here
+                          onChange={(e) => handleActionChange(index, 'description', e.target.value)}
+                          placeholder="Enter action description"
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
+                        />
                       </div>
                       <button
                         type="button"

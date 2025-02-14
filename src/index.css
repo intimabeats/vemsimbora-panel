@@ -37,3 +37,16 @@ select {
 :root {
   --input-height: 56px; /* Default input height */
 }
+
+.fade-out-confetti {
+  animation: fadeOut 1s forwards; /* 1s duration, forwards keeps the final state */
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

@@ -1,29 +1,30 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Layout } from '../../components/Layout'
 import {
-  Users,
   Plus,
   Edit,
   Trash2,
-  Filter,
   Search,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react'
 import { UserSchema } from '../../types/firestore-schema'
-import { userManagementService } from '../../services/UserManagementService'
+import { userManagementService } from '../../services/UserManagementService' // Corrected import
 import { CreateUserModal } from '../../components/modals/CreateUserModal'
 import { EditUserModal } from '../../components/modals/EditUserModal'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
+import useDebounce from '../../utils/useDebounce'
+import { getDefaultProfileImage } from '../../utils/user'
 
 export const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<UserSchema[]>([])
-  const [isLoading, setLoading] = useState(true); // Add loading state
+  const [isLoading, setLoading] = useState(true)
   const [filter, setFilter] = useState<{
     role?: UserSchema['role']
     status?: UserSchema['status']
   }>({})
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1)
@@ -36,18 +37,15 @@ export const UserManagement: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
-  useEffect(() => {
-    fetchUsers()
-  }, [filter, currentPage])
-
-  const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
     try {
-      setLoading(true); // Set loading to true before fetching
+      setLoading(true)
       const fetchedUsers = await userManagementService.fetchUsers({
         role: filter.role,
         status: filter.status,
         limit: itemsPerPage,
-        page: currentPage
+        page: currentPage,
+        searchTerm: debouncedSearchTerm // Use debounced term
       })
 
       setUsers(fetchedUsers.data)
@@ -55,22 +53,22 @@ export const UserManagement: React.FC = () => {
     } catch (error) {
       console.error('Erro ao buscar usuários:', error)
     } finally {
-      setLoading(false); // Set loading to false after fetching (both success and error)
+      setLoading(false)
     }
-  }
+  }, [filter.role, filter.status, currentPage, itemsPerPage, debouncedSearchTerm]) // Include debouncedSearchTerm
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers]) // Simplified dependency
 
   const handleDeleteUser = async () => {
     if (!selectedUser) return
 
     try {
       await userManagementService.deleteUser(selectedUser.id)
-
-      // Atualizar lista de usuários
       setUsers(prevUsers =>
         prevUsers.filter(user => user.id !== selectedUser.id)
       )
-
-      // Resetar seleção e fechar modal
       setSelectedUser(null)
       setIsDeleteModalOpen(false)
     } catch (error) {
@@ -100,11 +98,6 @@ export const UserManagement: React.FC = () => {
     )
   }
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
-
   const RoleBadge: React.FC<{ role: UserSchema['role'] }> = ({ role }) => {
     const roleStyles = {
       admin: 'bg-red-100 text-red-800',
@@ -124,9 +117,14 @@ export const UserManagement: React.FC = () => {
       <div className="container mx-auto p-6">
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center">
-              <Users className="mr-4 text-blue-600" /> Gerenciamento de Usuários
-            </h1>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center">
+                 Gerenciamento de Usuários
+              </h1>
+              <p className="text-gray-500 text-sm">
+                Gerencie e acompanhe todos os usuários do sistema.
+              </p>
+            </div>
             <button
               onClick={() => setIsCreateModalOpen(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition"
@@ -136,8 +134,8 @@ export const UserManagement: React.FC = () => {
           </div>
 
           {/* Filtros e Busca */}
-          <div className="flex space-x-4 mb-6">
-            <div className="relative flex-grow">
+          <div className="md:flex md:space-x-4 mb-6">
+            <div className="relative flex-grow mb-4 md:mb-0">
               <input
                 type="text"
                 placeholder="Buscar usuários..."
@@ -150,11 +148,13 @@ export const UserManagement: React.FC = () => {
 
             <select
               value={filter.role || ''}
-              onChange={(e) => setFilter({
-                ...filter,
-                role: e.target.value as UserSchema['role']
-              })}
-              className="px-4 py-2 border rounded-lg"
+              onChange={(e) =>
+                setFilter({
+                  ...filter,
+                  role: e.target.value as UserSchema['role']
+                })
+              }
+              className="w-full md:w-auto px-4 py-2 border rounded-lg mb-4 md:mb-0"
             >
               <option value="">Todos os Cargos</option>
               <option value="admin">Administradores</option>
@@ -164,11 +164,13 @@ export const UserManagement: React.FC = () => {
 
             <select
               value={filter.status || ''}
-              onChange={(e) => setFilter({
-                ...filter,
-                status: e.target.value as UserSchema['status']
-              })}
-              className="px-4 py-2 border rounded-lg"
+              onChange={(e) =>
+                setFilter({
+                  ...filter,
+                  status: e.target.value as UserSchema['status']
+                })
+              }
+              className="w-full md:w-auto px-4 py-2 border rounded-lg"
             >
               <option value="">Todos os Status</option>
               <option value="active">Ativos</option>
@@ -177,66 +179,69 @@ export const UserManagement: React.FC = () => {
             </select>
           </div>
 
-          {/* Tabela de Usuários */}
-          <div className="bg-white rounded-xl shadow-md overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cargo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-4">
-                      Nenhum usuário encontrado
-                    </td>
-                  </tr>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 whitespace-nowrap">{user.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">{user.email}</td>
-                      <td className="px-6 py-4">
-                        <RoleBadge role={user.role} />
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`
-                          px-2 py-1 rounded-full text-xs
-                          ${user.status === 'active' ? 'bg-green-100 text-green-800' :
-                            user.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
-                              'bg-yellow-100 text-yellow-800'}
-                        `}>
-                          {user.status === 'active' ? 'Ativo' :
-                            user.status === 'inactive' ? 'Inativo' :
-                              'Suspenso'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            onClick={() => handleEditUser(user)}
-                            className="text-blue-500 hover:text-blue-700"
-                          >
-                            <Edit size={20} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteConfirmation(user)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={20} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          {/* Lista de Usuários (Grid Layout) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {users.length === 0 ? (
+              <div className="text-center py-4 col-span-full">
+                Nenhum usuário encontrado
+              </div>
+            ) : (
+              users.map((user) => (
+                <div
+                  key={user.id}
+                  className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition group"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <img
+                        src={user.profileImage || getDefaultProfileImage(user.name)}
+                        alt={`Foto de ${user.name}`}
+                        className="w-10 h-10 rounded-full object-cover mr-4"
+                      />
+                      <div>
+                        <h2 className="text-lg font-semibold text-gray-800">
+                          {user.name}
+                        </h2>
+                        <p className="text-gray-600 text-sm">{user.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => handleEditUser(user)}
+                        className="text-blue-500 hover:text-blue-700"
+                      >
+                        <Edit size={20} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteConfirmation(user)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <RoleBadge role={user.role} />
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        user.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : user.status === 'inactive'
+                          ? 'bg-gray-100 text-gray-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}
+                    >
+                      {user.status === 'active'
+                        ? 'Ativo'
+                        : user.status === 'inactive'
+                        ? 'Inativo'
+                        : 'Suspenso'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
 
           {/* Paginação */}
@@ -246,14 +251,16 @@ export const UserManagement: React.FC = () => {
             </span>
             <div className="flex space-x-2">
               <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
                 className="px-4 py-2 border rounded-lg disabled:opacity-50 flex items-center"
               >
                 <ChevronLeft className="mr-2" /> Anterior
               </button>
               <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
                 disabled={currentPage === totalPages}
                 className="px-4 py-2 border rounded-lg disabled:opacity-50 flex items-center"
               >
@@ -292,3 +299,5 @@ export const UserManagement: React.FC = () => {
     </Layout>
   )
 }
+
+export default UserManagement

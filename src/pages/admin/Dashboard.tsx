@@ -10,7 +10,7 @@ import {
   ChevronRight
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
-import { userManagementService } from '../../services/UserManagementService'
+import { userManagementService } from '../../services/UserManagementService' // Corrected import
 import { taskService } from '../../services/TaskService'
 import { activityService } from '../../services/ActivityService';
 import { ActivityLogSchema, ProjectSchema, TaskSchema } from '../../types/firestore-schema';

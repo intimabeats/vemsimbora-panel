@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
 import { ProjectSchema } from '../../types/firestore-schema'
-import { userManagementService } from '../../services/UserManagementService'
+import { userManagementService } from '../../services/UserManagementService' // Corrected import
 
 interface EditProjectModalProps {
   project: ProjectSchema

@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { projectService } from '../../services/ProjectService'
-import { userManagementService } from '../../services/UserManagementService'
+import { userManagementService } from '../../services/UserManagementService' // Corrected import
 import { storage } from '../../config/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Message } from '../../components/Message'

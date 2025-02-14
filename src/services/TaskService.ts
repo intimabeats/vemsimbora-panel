@@ -1,347 +1,347 @@
 import {
-      getFirestore,
-      collection,
-      doc,
-      setDoc,
-      updateDoc,
-      deleteDoc,
-      getDocs,
-      getDoc,
-      query,
-      where,
-      orderBy,
-      limit
-    } from 'firebase/firestore'
-    import { auth } from '../config/firebase'
-    import { TaskSchema, ProjectSchema, TaskAction } from '../types/firestore-schema' // Import ProjectSchema
-    import { systemSettingsService } from './SystemSettingsService'
-    import { storage } from '../config/firebase'
-    import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-    import { notificationService } from './NotificationService' // Import NotificationService
-    import { projectService } from './ProjectService'
-    import { userManagementService } from './UserManagementService'
+  getFirestore,
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  getDoc,
+  query,
+  where,
+  orderBy,
+  limit
+} from 'firebase/firestore'
+import { auth } from '../config/firebase'
+import { TaskSchema, ProjectSchema, TaskAction } from '../types/firestore-schema' // Import ProjectSchema
+import { systemSettingsService } from './SystemSettingsService'
+import { storage } from '../config/firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { notificationService } from './NotificationService' // Import NotificationService
+import { projectService } from './ProjectService'
+import { userManagementService } from './UserManagementService'
 
-    export class TaskService {
-      private db = getFirestore()
+export class TaskService {
+  private db = getFirestore()
 
-      // Criar nova tarefa
-      async createTask(taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'>) {
-        try {
-          const taskRef = doc(collection(this.db, 'tasks'))
-          const settings = await systemSettingsService.getSettings()
+  // Criar nova tarefa
+  async createTask(taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'>) {
+    try {
+      const taskRef = doc(collection(this.db, 'tasks'))
+      const settings = await systemSettingsService.getSettings()
 
-          const coinsReward = Math.round(
-            taskData.difficultyLevel *
-            settings.taskCompletionBase *
-            settings.complexityMultiplier
-          )
+      const coinsReward = Math.round(
+        taskData.difficultyLevel *
+        settings.taskCompletionBase *
+        settings.complexityMultiplier
+      )
 
-          const newTask: TaskSchema = {
-            id: taskRef.id,
-            ...taskData,
-            createdBy: auth.currentUser?.uid || '',
-            status: 'pending',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            coinsReward,
-            subtasks: taskData.subtasks || [],
-            comments: taskData.comments || [],
-            attachments: taskData.attachments || [],
-            actions: taskData.actions || [] // Initialize actions
-          }
-
-          await setDoc(taskRef, newTask)
-          return newTask
-        } catch (error) {
-          console.error('Erro ao criar tarefa:', error)
-          throw error
-        }
+      const newTask: TaskSchema = {
+        id: taskRef.id,
+        ...taskData,
+        createdBy: auth.currentUser?.uid || '',
+        status: 'pending',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        coinsReward,
+        subtasks: taskData.subtasks || [],
+        comments: taskData.comments || [],
+        attachments: taskData.attachments || [],
+        actions: taskData.actions || [] // Initialize actions
       }
 
-      // Atualizar tarefa
-      async updateTask(taskId: string, updates: Partial<TaskSchema>) {
-        try {
-          const taskRef = doc(this.db, 'tasks', taskId);
-          const taskSnap = await getDoc(taskRef); // Get *previous* task data
+      await setDoc(taskRef, newTask)
+      return newTask
+    } catch (error) {
+      console.error('Erro ao criar tarefa:', error)
+      throw error
+    }
+  }
 
-          if (!taskSnap.exists()) {
-            throw new Error("Task not found");
-          }
-          const previousTaskData = taskSnap.data() as TaskSchema;
+  // Atualizar tarefa
+  async updateTask(taskId: string, updates: Partial<TaskSchema>) {
+    try {
+      const taskRef = doc(this.db, 'tasks', taskId);
+      const taskSnap = await getDoc(taskRef); // Get *previous* task data
 
-          const settings = await systemSettingsService.getSettings()
+      if (!taskSnap.exists()) {
+        throw new Error("Task not found");
+      }
+      const previousTaskData = taskSnap.data() as TaskSchema;
 
-          // Recalculate coins reward if difficulty changes
-          const coinsReward = updates.difficultyLevel
-            ? Math.round(
-              updates.difficultyLevel *
-              settings.taskCompletionBase *
-              settings.complexityMultiplier
-            )
-            : undefined
+      const settings = await systemSettingsService.getSettings()
 
-          const updateData = {
-            ...updates,
-            ...(coinsReward ? { coinsReward } : {}),
-            updatedAt: Date.now()
-          }
+      // Recalculate coins reward if difficulty changes
+      const coinsReward = updates.difficultyLevel
+        ? Math.round(
+          updates.difficultyLevel *
+          settings.taskCompletionBase *
+          settings.complexityMultiplier
+        )
+        : undefined
 
-          await updateDoc(taskRef, updateData)
+      const updateData = {
+        ...updates,
+        ...(coinsReward ? { coinsReward } : {}),
+        updatedAt: Date.now()
+      }
 
-          // Fetch updated task
-          const updatedDoc = await getDoc(taskRef)
-          const updatedTaskData = { id: updatedDoc.id, ...updatedDoc.data() } as TaskSchema;
+      await updateDoc(taskRef, updateData)
 
-          // *** NOTIFICATION LOGIC ***
-          if (previousTaskData.status !== updatedTaskData.status) {
-            // Status changed!
-            const projectData = await projectService.getProjectById(updatedTaskData.projectId);
+      // Fetch updated task
+      const updatedDoc = await getDoc(taskRef)
+      const updatedTaskData = { id: updatedDoc.id, ...updatedDoc.data() } as TaskSchema;
 
-            // Create notification for assigned users
-            for (const userId of updatedTaskData.assignedTo) {
-              await notificationService.createNotification(
-                userId,
-                {
-                  type: 'task_updated',
-                  title: 'Task Status Updated',
-                  message: `Task '${updatedTaskData.title}' in project '${projectData.name}' has been updated to ${updatedTaskData.status}`,
-                  relatedEntityId: taskId,
-                }
-              );
+      // *** NOTIFICATION LOGIC ***
+      if (previousTaskData.status !== updatedTaskData.status) {
+        // Status changed!
+        const projectData = await projectService.getProjectById(updatedTaskData.projectId);
+
+        // Create notification for assigned users
+        for (const userId of updatedTaskData.assignedTo) {
+          await notificationService.createNotification(
+            userId,
+            {
+              type: 'task_updated',
+              title: 'Task Status Updated',
+              message: `Task '${updatedTaskData.title}' in project '${projectData.name}' has been updated to ${updatedTaskData.status}`,
+              relatedEntityId: taskId,
             }
-            //Notify project managers
-            if (projectData && projectData.managers) {
-              for (const managerId of projectData.managers) {
-                await notificationService.createNotification(
-                  managerId,
-                  {
-                    type: 'task_updated',
-                    title: 'Task Status Updated',
-                    message: `Task '${updatedTaskData.title}' in project '${projectData.name}' has been updated to ${updatedTaskData.status}`,
-                    relatedEntityId: taskId,
-                  }
-                );
-              }
-            }
-          }
-
-          return updatedTaskData;
-        } catch (error) {
-          console.error('Erro ao atualizar tarefa:', error)
-          throw error
-        }
-      }
-
-      // Excluir tarefa
-      async deleteTask(taskId: string) {
-        try {
-          const taskRef = doc(this.db, 'tasks', taskId)
-          await deleteDoc(taskRef)
-        } catch (error) {
-          console.error('Erro ao excluir tarefa:', error)
-          throw error
-        }
-      }
-
-      // Buscar tarefas com paginação e filtros
-      async fetchTasks(options?: {
-        projectId?: string
-        status?: TaskSchema['status']
-        assignedTo?: string
-        limit?: number
-        page?: number
-      }) {
-        try {
-          let q = query(collection(this.db, 'tasks'))
-
-          // Filtros
-          if (options?.projectId) {
-            q = query(q, where('projectId', '==', options.projectId))
-          }
-
-          if (options?.status) {
-            q = query(q, where('status', '==', options.status))
-          }
-
-          if (options?.assignedTo) {
-            q = query(q, where('assignedTo', 'array-contains', options.assignedTo))
-          }
-
-          // Ordenação
-          q = query(q, orderBy('createdAt', 'desc'))
-
-          // Executar consulta
-          const snapshot = await getDocs(q)
-          const allTasks = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          } as TaskSchema))
-
-          // Paginação
-          const limit = options?.limit || 10
-          const page = options?.page || 1
-          const startIndex = (page - 1) * limit
-          const endIndex = startIndex + limit
-
-          const paginatedTasks = allTasks.slice(startIndex, endIndex)
-          const totalPages = Math.ceil(allTasks.length / limit)
-
-          return {
-            data: paginatedTasks,
-            totalPages,
-            totalTasks: allTasks.length
-          }
-        } catch (error) {
-          console.error('Erro ao buscar tarefas:', error)
-          throw error
-        }
-      }
-
-      // Buscar tarefa por ID
-      async getTaskById(taskId: string): Promise<TaskSchema> {
-        try {
-          const taskRef = doc(this.db, 'tasks', taskId)
-          const taskSnap = await getDoc(taskRef)
-
-          if (taskSnap.exists()) {
-            return {
-              id: taskSnap.id,
-              ...taskSnap.data()
-            } as TaskSchema
-          } else {
-            throw new Error('Tarefa não encontrada')
-          }
-        } catch (error) {
-          console.error('Erro ao buscar tarefa:', error)
-          throw error
-        }
-      }
-
-      // Upload de anexos para tarefa
-      async uploadTaskAttachment(taskId: string, file: File): Promise<string> {
-        try {
-          const storageRef = ref(storage, `tasks/${taskId}/attachments/${file.name}`)
-          await uploadBytes(storageRef, file)
-          const downloadURL = await getDownloadURL(storageRef)
-
-          // Atualizar tarefa com novo anexo
-          const taskRef = doc(this.db, 'tasks', taskId)
-          await updateDoc(taskRef, {
-            attachments: [...(await this.getTaskAttachments(taskId)), downloadURL]
-          })
-
-          return downloadURL
-        } catch (error) {
-          console.error('Erro ao fazer upload de anexo:', error)
-          throw error
-        }
-      }
-
-      // Buscar anexos de uma tarefa
-      async getTaskAttachments(taskId: string): Promise<string[]> {
-        try {
-          const taskRef = doc(this.db, 'tasks', taskId)
-          const taskSnap = await getDoc(taskRef)
-
-          if (taskSnap.exists()) {
-            const taskData = taskSnap.data() as TaskSchema
-            return taskData.attachments || []
-          }
-
-          return []
-        } catch (error) {
-          console.error('Erro ao buscar anexos:', error)
-          throw error
-        }
-      }
-
-      // Adicionar comentário à tarefa
-      async addTaskComment(
-        taskId: string,
-        comment: {
-          userId: string,
-          text: string,
-          attachments?: string[]
-        }
-      ) {
-        try {
-          const taskRef = doc(this.db, 'tasks', taskId)
-          const taskDoc = await getDoc(taskRef)
-
-          if (!taskDoc.exists()) {
-            throw new Error('Tarefa não encontrada')
-          }
-
-          const taskData = taskDoc.data() as TaskSchema
-          const newComment = {
-            id: Date.now().toString(),
-            userId: comment.userId,
-            text: comment.text,
-            createdAt: Date.now(),
-            attachments: comment.attachments || []
-          }
-
-          await updateDoc(taskRef, {
-            comments: [...(taskData.comments || []), newComment],
-            updatedAt: Date.now()
-          })
-
-          return newComment
-        } catch (error) {
-          console.error('Erro ao adicionar comentário:', error)
-          throw error
-        }
-      }
-
-      // NEW: Complete a task action
-      async completeTaskAction(taskId: string, actionId: string, data?: any): Promise<void> {
-        try {
-          const taskRef = doc(this.db, 'tasks', taskId);
-          const taskSnap = await getDoc(taskRef);
-
-          if (!taskSnap.exists()) {
-            throw new Error('Task not found');
-          }
-
-          const taskData = taskSnap.data() as TaskSchema;
-          const updatedActions = taskData.actions.map(action =>
-            action.id === actionId ? { ...action, completed: true, completedAt: Date.now(), data } : action
           );
-
-          await updateDoc(taskRef, {
-            actions: updatedActions,
-            updatedAt: Date.now()
-          });
-        } catch (error) {
-          console.error('Error completing task action:', error);
-          throw error;
+        }
+        //Notify project managers
+        if (projectData && projectData.managers) {
+          for (const managerId of projectData.managers) {
+            await notificationService.createNotification(
+              managerId,
+              {
+                type: 'task_updated',
+                title: 'Task Status Updated',
+                message: `Task '${updatedTaskData.title}' in project '${projectData.name}' has been updated to ${updatedTaskData.status}`,
+                relatedEntityId: taskId,
+              }
+            );
+          }
         }
       }
 
-      // NEW: Uncomplete a task action
+      return updatedTaskData;
+    } catch (error) {
+      console.error('Erro ao atualizar tarefa:', error)
+      throw error
+    }
+  }
+
+  // Excluir tarefa
+  async deleteTask(taskId: string) {
+    try {
+      const taskRef = doc(this.db, 'tasks', taskId)
+      await deleteDoc(taskRef)
+    } catch (error) {
+      console.error('Erro ao excluir tarefa:', error)
+      throw error
+    }
+  }
+
+  // Buscar tarefas com paginação e filtros
+  async fetchTasks(options?: {
+    projectId?: string
+    status?: TaskSchema['status']
+    assignedTo?: string
+    limit?: number
+    page?: number
+  }) {
+    try {
+      let q = query(collection(this.db, 'tasks'))
+
+      // Filtros
+      if (options?.projectId) {
+        q = query(q, where('projectId', '==', options.projectId))
+      }
+
+      if (options?.status) {
+        q = query(q, where('status', '==', options.status))
+      }
+
+      if (options?.assignedTo) {
+        q = query(q, where('assignedTo', 'array-contains', options.assignedTo))
+      }
+
+      // Ordenação
+      q = query(q, orderBy('createdAt', 'desc'))
+
+      // Executar consulta
+      const snapshot = await getDocs(q)
+      const allTasks = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as TaskSchema))
+
+      // Paginação
+      const limit = options?.limit || 10
+      const page = options?.page || 1
+      const startIndex = (page - 1) * limit
+      const endIndex = startIndex + limit
+
+      const paginatedTasks = allTasks.slice(startIndex, endIndex)
+      const totalPages = Math.ceil(allTasks.length / limit)
+
+      return {
+        data: paginatedTasks,
+        totalPages,
+        totalTasks: allTasks.length
+      }
+    } catch (error) {
+      console.error('Erro ao buscar tarefas:', error)
+      throw error
+    }
+  }
+
+  // Buscar tarefa por ID
+  async getTaskById(taskId: string): Promise<TaskSchema> {
+    try {
+      const taskRef = doc(this.db, 'tasks', taskId)
+      const taskSnap = await getDoc(taskRef)
+
+      if (taskSnap.exists()) {
+        return {
+          id: taskSnap.id,
+          ...taskSnap.data()
+        } as TaskSchema
+      } else {
+        throw new Error('Tarefa não encontrada')
+      }
+    } catch (error) {
+      console.error('Erro ao buscar tarefa:', error)
+      throw error
+    }
+  }
+
+  // Upload de anexos para tarefa
+  async uploadTaskAttachment(taskId: string, file: File): Promise<string> {
+    try {
+      const storageRef = ref(storage, `tasks/${taskId}/attachments/${file.name}`)
+      await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(storageRef)
+
+      // Atualizar tarefa com novo anexo
+      const taskRef = doc(this.db, 'tasks', taskId)
+      await updateDoc(taskRef, {
+        attachments: [...(await this.getTaskAttachments(taskId)), downloadURL]
+      })
+
+      return downloadURL
+    } catch (error) {
+      console.error('Erro ao fazer upload de anexo:', error)
+      throw error
+    }
+  }
+
+  // Buscar anexos de uma tarefa
+  async getTaskAttachments(taskId: string): Promise<string[]> {
+    try {
+      const taskRef = doc(this.db, 'tasks', taskId)
+      const taskSnap = await getDoc(taskRef)
+
+      if (taskSnap.exists()) {
+        const taskData = taskSnap.data() as TaskSchema
+        return taskData.attachments || []
+      }
+
+      return []
+    } catch (error) {
+      console.error('Erro ao buscar anexos:', error)
+      throw error
+    }
+  }
+
+  // Adicionar comentário à tarefa
+  async addTaskComment(
+    taskId: string,
+    comment: {
+      userId: string,
+      text: string,
+      attachments?: string[]
+    }
+  ) {
+    try {
+      const taskRef = doc(this.db, 'tasks', taskId)
+      const taskDoc = await getDoc(taskRef)
+
+      if (!taskDoc.exists()) {
+        throw new Error('Tarefa não encontrada')
+      }
+
+      const taskData = taskDoc.data() as TaskSchema
+      const newComment = {
+        id: Date.now().toString(),
+        userId: comment.userId,
+        text: comment.text,
+        createdAt: Date.now(),
+        attachments: comment.attachments || []
+      }
+
+      await updateDoc(taskRef, {
+        comments: [...(taskData.comments || []), newComment],
+        updatedAt: Date.now()
+      })
+
+      return newComment
+    } catch (error) {
+      console.error('Erro ao adicionar comentário:', error)
+      throw error
+    }
+  }
+
+  // NEW: Complete a task action
+  async completeTaskAction(taskId: string, actionId: string, data?: any): Promise<void> {
+    try {
+      const taskRef = doc(this.db, 'tasks', taskId);
+      const taskSnap = await getDoc(taskRef);
+
+      if (!taskSnap.exists()) {
+        throw new Error('Task not found');
+      }
+
+      const taskData = taskSnap.data() as TaskSchema;
+      const updatedActions = taskData.actions.map(action =>
+        action.id === actionId ? { ...action, completed: true, completedAt: Date.now(), completedBy: auth.currentUser?.uid, data } : action // Add completedBy
+      );
+
+      await updateDoc(taskRef, {
+        actions: updatedActions,
+        updatedAt: Date.now()
+      });
+    } catch (error) {
+      console.error('Error completing task action:', error);
+      throw error;
+    }
+  }
+
+  // NEW: Uncomplete a task action
       async uncompleteTaskAction(taskId: string, actionId: string): Promise<void> {
         try {
-          const taskRef = doc(this.db, 'tasks', taskId);
-          const taskSnap = await getDoc(taskRef);
+            const taskRef = doc(this.db, 'tasks', taskId);
+            const taskSnap = await getDoc(taskRef);
 
-          if (!taskSnap.exists()) {
-            throw new Error('Task not found');
-          }
+            if (!taskSnap.exists()) {
+                throw new Error('Task not found');
+            }
 
-          const taskData = taskSnap.data() as TaskSchema;
-          const updatedActions = taskData.actions.map(action =>
-            action.id === actionId ? { ...action, completed: false, completedAt: null, data: null } : action
-          );
+            const taskData = taskSnap.data() as TaskSchema;
+            const updatedActions = taskData.actions.map(action =>
+                action.id === actionId ? { ...action, completed: false, completedAt: null, completedBy: null, data: null } : action
+            );
 
-          await updateDoc(taskRef, {
-            actions: updatedActions,
-            updatedAt: Date.now()
-          });
+            await updateDoc(taskRef, {
+                actions: updatedActions,
+                updatedAt: Date.now()
+            });
         } catch (error) {
-          console.error('Error uncompleting task action:', error);
-          throw error;
+            console.error('Error uncompleting task action:', error);
+            throw error;
         }
-      }
     }
+}
 
-    export const taskService = new TaskService()
+export const taskService = new TaskService()

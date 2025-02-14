@@ -16,9 +16,10 @@ import { storage } from '../config/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Validation } from '../utils/validation'
 import { Layout } from '../components/Layout'
+import { userManagementService } from '../services/UserManagementService' // Import
 
 export const Profile: React.FC = () => {
-  const { currentUser, logout, setCurrentUser } = useAuth() // Get setCurrentUser
+  const { currentUser, logout, setCurrentUser } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -67,6 +68,7 @@ export const Profile: React.FC = () => {
 
       // Update profile immediately --  AND UPDATE CURRENT USER!
       await AuthService.updateProfile(currentUser!.uid, { photoURL: downloadURL })
+      await userManagementService.updateUser(currentUser!.uid, { profileImage: downloadURL }) // Update Firestore
       setCurrentUser(prevUser => prevUser ? { ...prevUser, photoURL: downloadURL } : null) // VERY IMPORTANT
       setSuccess('Imagem de perfil atualizada!')
 
@@ -138,6 +140,7 @@ export const Profile: React.FC = () => {
 
       // Update profile (name and potentially photoURL)
       await AuthService.updateProfile(currentUser!.uid, updates)
+      await userManagementService.updateUser(currentUser!.uid, updates) // Update Firestore
       setSuccess('Perfil atualizado com sucesso!')
       // Update the currentUser in the context
       setCurrentUser(prevUser => prevUser ? { ...prevUser, displayName: name, ...updates } : null);

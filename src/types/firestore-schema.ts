@@ -42,55 +42,56 @@
 
     // Task Schema
     export interface TaskSchema {
-      id: string
-      projectId: string
-      title: string
-      description: string
-      status: 'pending' | 'in_progress' | 'waiting_approval' | 'completed' | 'blocked'
-      priority: 'low' | 'medium' | 'high' | 'critical'
-      assignedTo: string[] // User IDs
-      createdBy: string // User ID
-      startDate?: number
-      dueDate: number
-      completedAt?: number
-      difficultyLevel: number // Difficulty level 0-10
-      coinsReward: number // Calculated reward
-      subtasks?: {
-        id: string
-        title: string
-        completed: boolean
-        completedAt?: number
-      }[]
-      comments?: {
-        id: string
-        userId: string
-        text: string
-        createdAt: number
-        attachments?: string[] // URLs or file references
-      }[]
-      attachments?: string[] // URLs or file references
-      createdAt: number
-      updatedAt: number
-      actions: TaskAction[]; // NEW: Array of actions
-    }
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'waiting_approval' | 'completed' | 'blocked';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  assignedTo: string; // Changed from string[] to string
+  createdBy: string; // User ID
+  startDate?: number;
+  dueDate: number;
+  completedAt?: number;
+  difficultyLevel: number; // Difficulty level 0-10
+  coinsReward: number; // Calculated reward
+  subtasks?: {
+    id: string;
+    title: string;
+    completed: boolean;
+    completedAt?: number;
+  }[];
+  comments?: {
+    id: string;
+    userId: string;
+    text: string;
+    createdAt: number;
+    attachments?: string[]; // URLs or file references
+  }[];
+  attachments?: string[]; // URLs or file references
+  createdAt: number;
+  updatedAt: number;
+  actions: TaskAction[]; // NEW: Array of actions
+}
 
-    //  Interface for a task action
-    export interface TaskAction {
-      id: string;
-      title: string;
-      type: 'text' | 'file_upload' | 'approval' | 'date'; // Expand as needed
-      completed: boolean;
-      completedAt?: number | null;
-      data?: any; // For storing action-specific data (e.g., file URL)
-    }
+//  Interface for a task action
+export interface TaskAction {
+  id: string;
+  title: string;
+  type: 'text' | 'file_upload' | 'approval' | 'date';
+  completed: boolean;
+  completedAt?: number | null;
+  completedBy?: string | null; // NEW: User ID of who completed the action
+  data?: any;
+  description?: string;
+}
 
-    //NEW: Interface for a task action template
-    export interface ActionTemplateSchema {
-        id: string;
-        title: string;
-        type: 'text' | 'file_upload' | 'approval' | 'date';
-        data?: any; // For default data, instructions, etc.
-    }
+//NEW: Interface for a task action template
+export interface ActionTemplateSchema {
+    id: string;
+    title: string;
+    elements: TaskAction[]; // Now includes description
+}
 
     // Reward Schema
     export interface RewardSchema {
