@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Layout } from '../../components/Layout'
 import {
   CheckCircle,
-  X,
   AlertTriangle,
   Plus,
-  Trash2
+  Trash2,
+  ArrowLeft // Import ArrowLeft
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -13,29 +15,20 @@ import { TaskSchema, TaskAction } from '../../types/firestore-schema'
 import { systemSettingsService } from '../../services/SystemSettingsService'
 import { actionTemplateService } from '../../services/ActionTemplateService';
 
-interface CreateTaskModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onTaskCreated: (task: TaskSchema) => void
-  projectId?: string; // Add projectId as an optional prop
-}
+export const CreateProjectTask: React.FC = () => {
+  const { projectId } = useParams<{ projectId: string }>()
+  const navigate = useNavigate()
 
-export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
-  isOpen,
-  onClose,
-  onTaskCreated,
-  projectId // Receive projectId
-}) => {
-  // Basic form state
+  // Basic form state (same as CreateTaskModal, but projectId is known)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    projectId: projectId || '', // Use prop, fallback to empty string
+    projectId: projectId || '', // Directly use projectId from route params
     assignedTo: [] as string[],
     priority: 'medium' as TaskSchema['priority'],
     dueDate: new Date().toISOString().split('T')[0],
     difficultyLevel: 5,
-    actions: [] as TaskAction[] // Initialize actions
+    actions: [] as TaskAction[]
   })
 
   // UI state
@@ -44,85 +37,62 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [error, setError] = useState<string | null>(null)
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
 
-  // Data state
-  const [projects, setProjects] = useState<{ id: string, name: string }[]>([])
+  // Data state (no need for projects, as it's fixed)
   const [users, setUsers] = useState<{ id: string, name: string }[]>([])
   const [coinsReward, setCoinsReward] = useState(0)
-  const [templates, setTemplates] = useState<{ id: string, title: string }[]>([]); // State for templates
-  const [selectedTemplate, setSelectedTemplate] = useState(''); // State for selected template
-  const [selectedProjectName, setSelectedProjectName] = useState(''); // NEW: To store and display the selected project's name
+  const [templates, setTemplates] = useState<{ id: string, title: string }[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+    const [projectName, setProjectName] = useState('');
 
 
-  // Reset form when modal opens/closes or projectId changes
     useEffect(() => {
-        if (!isOpen) {
-            setFormData({
-                title: '',
-                description: '',
-                projectId: projectId || '', // Use the prop, fallback to empty string
-                assignedTo: [],
-                priority: 'medium',
-                dueDate: new Date().toISOString().split('T')[0],
-                difficultyLevel: 5,
-                actions: [] // Reset actions
-            });
-            setStep(1);
-            setError(null);
-            setFormErrors({});
-            setSelectedTemplate(''); // Reset selected template
-            setSelectedProjectName(''); // Reset selected project name
-        } else {
-            // If the modal is open and projectId is provided, update the form
-            setFormData(prev => ({ ...prev, projectId: projectId || '' }));
-        }
-    }, [isOpen, projectId]);
+        if (projectId) {
+            // Set the projectId in formData when the component mounts and projectId is available
+            setFormData(prev => ({ ...prev, projectId: projectId }));
 
-  // Load initial data (projects, users, settings, templates)
+            // Fetch the project name
+            projectService.getProjectById(projectId)
+                .then(project => setProjectName(project.name))
+                .catch(err => {
+                    console.error("Error fetching project name:", err);
+                    setError("Failed to fetch project name."); // Set error state
+                });
+        }
+    }, [projectId]); // Run this effect whenever projectId changes
+
+  // Load initial data (users, settings, templates) - NO PROJECTS
   useEffect(() => {
-    if (isOpen) {
-      const loadData = async () => {
-        try {
-          const [projectsRes, usersRes, settings, templatesRes] = await Promise.all([
-            projectService.fetchProjects(),
-            userManagementService.fetchUsers(),
-            systemSettingsService.getSettings(),
-            actionTemplateService.fetchActionTemplates() // Fetch templates
-          ])
+    const loadData = async () => {
+      try {
+        const [usersRes, settings, templatesRes] = await Promise.all([
+          userManagementService.fetchUsers(),
+          systemSettingsService.getSettings(),
+          actionTemplateService.fetchActionTemplates()
+        ])
 
-          setProjects(projectsRes.data.map(p => ({ id: p.id, name: p.name })))
-          setUsers(usersRes.data.map(u => ({ id: u.id, name: u.name })))
-          setCoinsReward(Math.round(settings.taskCompletionBase * formData.difficultyLevel * settings.complexityMultiplier))
-          setTemplates(templatesRes.map(t => ({ id: t.id, title: t.title }))); // Set templates
-
-          // NEW: If projectId is provided, find and set the project name
-          if (projectId) {
-            const preselectedProject = projectsRes.data.find(p => p.id === projectId);
-            if (preselectedProject) {
-              setSelectedProjectName(preselectedProject.name);
-            }
-          }
-        } catch (err) {
-          setError('Failed to load data')
-        }
+        setUsers(usersRes.data.map(u => ({ id: u.id, name: u.name })))
+        setCoinsReward(Math.round(settings.taskCompletionBase * formData.difficultyLevel * settings.complexityMultiplier))
+        setTemplates(templatesRes.map(t => ({ id: t.id, title: t.title })));
+      } catch (err) {
+        setError('Falha ao carregar dados')
       }
-
-      loadData()
     }
-  }, [isOpen, formData.difficultyLevel, projectId]) // Add projectId to dependencies
 
-  // Form validation (Step 1)
+    loadData()
+  }, [formData.difficultyLevel]) // Removed isOpen
+
+  // Form validation (Step 1) - NO PROJECT VALIDATION
   const validateStep1 = () => {
     const errors: { [key: string]: string } = {}
     if (!formData.title.trim()) errors.title = 'Título é obrigatório'
     if (!formData.description.trim()) errors.description = 'Descrição é obrigatória'
-    if (!formData.projectId) errors.projectId = 'Projeto é obrigatório'
     if (formData.assignedTo.length === 0) errors.assignedTo = 'Pelo menos um responsável é obrigatório'
 
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
-  // Form validation (Step 2)
+  // Form validation (Step 2) - Remains the same
   const validateStep2 = () => {
     const errors: { [key: string]: string } = {}
     if (!formData.dueDate) errors.dueDate = 'Data de vencimento é obrigatória'
@@ -131,7 +101,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     return Object.keys(errors).length === 0
   }
 
-  // Event handlers
+  // Event handlers - Remains mostly the same
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -150,23 +120,20 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
   }
 
-    // Handle changes within an action (title, description, etc.)
-    const handleActionChange = (index: number, field: keyof TaskAction, value: any) => {
-        setFormData(prev => {
-            const newActions = [...prev.actions];
-            newActions[index] = { ...newActions[index], [field]: value };
-            return { ...prev, actions: newActions };
-        });
-    };
+  const handleActionChange = (index: number, field: keyof TaskAction, value: any) => {
+    setFormData(prev => {
+      const newActions = [...prev.actions];
+      newActions[index] = { ...newActions[index], [field]: value };
+      return { ...prev, actions: newActions };
+    });
+  };
 
-    // Handle removing an action
-    const handleRemoveAction = (index: number) => {
-        setFormData(prev => ({
-            ...prev,
-            actions: prev.actions.filter((_, i) => i !== index)
-        }));
-    };
-
+  const handleRemoveAction = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      actions: prev.actions.filter((_, i) => i !== index)
+    }));
+  };
 
   const handleAddActionFromTemplate = async () => {
     if (!selectedTemplate) return;
@@ -175,10 +142,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       const fullTemplate = await actionTemplateService.getActionTemplateById(selectedTemplate);
       if (!fullTemplate) return;
 
-      // Deep copy and add new IDs, including description
       const newActions: TaskAction[] = JSON.parse(JSON.stringify(fullTemplate.elements)).map((action: TaskAction) => ({
         ...action,
-        id: Date.now().toString() + Math.random().toString(36).substring(7), // New unique ID
+        id: Date.now().toString() + Math.random().toString(36).substring(7),
         completed: false,
         completedAt: null,
       }));
@@ -208,8 +174,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         coinsReward
       })
 
-      onTaskCreated(newTask);
-      onClose(); // Close the modal on success
+      // Navigate to the task details page after successful creation
+      navigate(`/tasks/${newTask.id}`);
+
     } catch (err: any) {
       setError(err.message || 'Falha ao criar tarefa')
     } finally {
@@ -217,32 +184,29 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
   }
 
-  if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
-        <div className="flex justify-between items-center p-6 border-b">
-          <h2 className="text-xl font-bold flex items-center">
-            <CheckCircle className="mr-2 text-blue-600" />
-            Criar Nova Tarefa (Passo {step}/2)
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X size={24} />
-          </button>
+    <Layout role="admin">
+      <div className="container mx-auto p-6">
+        <div className="flex justify-between items-center mb-6">
+            <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-blue-600">
+                <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center">
+                <CheckCircle className="mr-3 text-blue-600" />
+                Criar Nova Tarefa para {projectName}
+            </h1>
+            <div></div> {/* This empty div is important for correct spacing */}
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center">
-              <AlertTriangle className="mr-2" />
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative flex items-center mb-4">
+            <AlertTriangle className="mr-2" />
+            {error}
+          </div>
+        )}
 
+        <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md space-y-4">
           {step === 1 ? (
             <>
               <div>
@@ -277,35 +241,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   <p className="text-red-500 text-xs mt-1">{formErrors.description}</p>
                 )}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Projeto
-                </label>
-                <select
-                    name="projectId"
-                    value={formData.projectId}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.projectId ? 'border-red-500' : 'focus:ring-blue-500'}`}
-                    disabled={!!projectId} // Disable if projectId is provided
-                >
-                    {projectId ? (
-                        <option value={formData.projectId}>{selectedProjectName || 'Carregando...'}</option>
-                    ) : (
-                        <>
-                            <option value="">Selecione o Projeto</option>
-                            {projects.map(project => (
-                                <option key={project.id} value={project.id}>
-                                    {project.name}
-                                </option>
-                            ))}
-                        </>
-                    )}
-                </select>
-                {formErrors.projectId && (
-                    <p className="text-red-500 text-xs mt-1">{formErrors.projectId}</p>
-                )}
-                </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -469,6 +404,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           )}
         </form>
       </div>
-    </div>
+    </Layout>
   )
 }

@@ -28,8 +28,10 @@ import { UserManagement } from './pages/admin/UserManagement'
 import { ProjectManagement } from './pages/admin/ProjectManagement'
 import { ProjectDetails } from './pages/admin/ProjectDetails'
 import { ProjectChat } from './pages/admin/ProjectChat'
-import { TaskManagement } from './pages/admin/TaskManagement' // Correct component for /admin/tasks
+import { TaskManagement } from './pages/admin/TaskManagement'
 import { SystemSettings } from './pages/admin/SystemSettings'
+import { CreateProjectTask } from './pages/admin/CreateProjectTask'
+import { EditProjectTask } from './pages/admin/EditProjectTask' // Import the new page
 
 // Manager Imports
 import { ManagerDashboard } from './pages/manager/Dashboard'
@@ -116,6 +118,25 @@ const App: React.FC = () => {
               element={
                 <PrivateRoute allowedRoles={['admin', 'manager']}>
                   <ProjectChat />
+                </PrivateRoute>
+              }
+            />
+            {/* NEW: Route for creating tasks within a project */}
+            <Route
+              path="/admin/projects/:projectId/create-task"
+              element={
+                <PrivateRoute allowedRoles={['admin', 'manager']}>
+                  <CreateProjectTask />
+                </PrivateRoute>
+              }
+            />
+
+            {/* NEW: Route for editing tasks within a project */}
+            <Route
+              path="/admin/projects/:projectId/edit-task/:taskId"
+              element={
+                <PrivateRoute allowedRoles={['admin', 'manager']}>
+                  <EditProjectTask />
                 </PrivateRoute>
               }
             />

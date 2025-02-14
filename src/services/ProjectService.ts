@@ -36,7 +36,8 @@ export class ProjectService {
             name: 'Geral',
             comments: []
           }
-        ]
+        ],
+        messages: [] // Initialize messages here
       }
 
       await setDoc(projectRef, newProject)
@@ -55,6 +56,8 @@ async addProjectMessage(
     content: string
     timestamp: number
     attachments?: any[]
+    messageType?: 'task_submission' | 'task_approval' | 'general'; // Type of message
+    originalMessageId?: string
   }
 ) {
   try {
@@ -78,6 +81,51 @@ async addProjectMessage(
     console.error('Erro ao adicionar mensagem:', error)
     throw error
   }
+}
+
+// NEW: Add a system message, handling updates for existing messages
+async addSystemMessageToProjectChat(
+    projectId: string,
+    message: {
+        userId: string;
+        userName: string;
+        content: string;
+        timestamp: number;
+        attachments?: any[];
+        messageType: 'task_submission' | 'task_approval' | 'general';
+        originalMessageId?: string; // ID of the original message, if this is an update
+        quotedMessage?: { userName: string; content: string; attachments?: any[] };
+    }
+): Promise<void> {
+    try {
+        const projectRef = doc(this.db, 'projects', projectId);
+        const projectDoc = await getDoc(projectRef);
+
+        if (!projectDoc.exists()) {
+            throw new Error('Project not found');
+        }
+
+        const projectData = projectDoc.data() as ProjectSchema;
+        let messages = projectData.messages || [];
+
+        if (message.originalMessageId) {
+            // This is an UPDATE to an existing message
+            messages = messages.map((msg: any) =>
+                msg.id === message.originalMessageId ? { ...msg, content: message.content, timestamp: message.timestamp } : msg
+            );
+        } else {
+            // This is a NEW message
+            messages = [...messages, { ...message, id: Date.now().toString() }]; // Assign a unique ID
+        }
+
+        await updateDoc(projectRef, {
+            messages: messages,
+            updatedAt: Date.now(),
+        });
+    } catch (error) {
+        console.error('Error adding system message:', error);
+        throw error;
+    }
 }
 
 	async getProjectMessages(projectId: string): Promise<any[]> {

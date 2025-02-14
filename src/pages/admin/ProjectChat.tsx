@@ -1,4 +1,3 @@
-// src/pages/admin/ProjectChat.tsx
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
@@ -12,13 +11,12 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { projectService } from '../../services/ProjectService'
-import { userManagementService } from '../../services/UserManagementService' // Corrected import
+import { userManagementService } from '../../services/UserManagementService'
 import { storage } from '../../config/firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Message } from '../../components/Message'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
 import { getDefaultProfileImage } from '../../utils/user'
-
 
 interface MessageType {
   id: string
@@ -44,6 +42,8 @@ interface MessageType {
       size?: number;
     }[];
   }
+  originalMessageId?: string; // ID of the original submission message (for updates)
+  messageType?: 'task_submission' | 'task_approval' | 'general'; // Type of message
 }
 
 // Functional component for the Managers Modal
@@ -80,6 +80,8 @@ export const ProjectChat: React.FC = () => {
   const { currentUser } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null); // Ref for the input field
+
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -222,6 +224,7 @@ export const ProjectChat: React.FC = () => {
                         attachments: quotedMessage.attachments,
                     }
                     : null, // Ensure quotedMessage is null if not present
+              messageType: 'general'
             };
 
             // Add the new message to Firestore
@@ -286,7 +289,7 @@ export const ProjectChat: React.FC = () => {
 
 
   return (
-    <Layout role="admin">
+    <Layout role={currentUser?.role || 'employee'}>
       <div className="flex flex-col h-screen">
         {/* Fixed Header */}
         <div  className="bg-white shadow-md p-4 flex-shrink-0">
@@ -321,10 +324,9 @@ export const ProjectChat: React.FC = () => {
 
         {/* Chat Container (scrollable) */}
         <div
-
-            className="flex-1 overflow-y-auto bg-gray-50 pb-[env(safe-area-inset-bottom)]"
+            className="flex-1 overflow-y-auto bg-gray-50 p-4"
             ref={chatContainerRef}
-
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {messages.map((message, index) => (
             <Message
@@ -411,6 +413,7 @@ export const ProjectChat: React.FC = () => {
               placeholder="Digite sua mensagem..."
               className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              ref={inputRef}
             />
 
             <button

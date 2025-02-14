@@ -159,7 +159,7 @@ import React, { ReactNode, useRef, useState, useEffect } from 'react'
     export const Layout: React.FC<{
       children: ReactNode,
       role?: Role,
-      isLoading?: boolean,
+      isLoading?: boolean,  // isLoading is now a prop of Layout
       hideNavigation?: boolean;
     }> = ({ children, role = 'employee', isLoading = false, hideNavigation = false }) => {
 

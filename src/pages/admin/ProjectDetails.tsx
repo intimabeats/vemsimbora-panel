@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
 import {
@@ -12,15 +12,17 @@ import {
   FileText,
   Download,
   ArrowLeft,
-  Music
+  Music,
+  Plus,
+  Edit
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
 import { taskService } from '../../services/TaskService'
-import { userManagementService } from '../../services/UserManagementService' // Corrected import
+import { userManagementService } from '../../services/UserManagementService'
 import { useAuth } from '../../context/AuthContext'
 import { ProjectSchema, TaskSchema } from '../../types/firestore-schema'
-import { getDefaultProfileImage } from '../../utils/user' // Corrected Import
-import { Link } from 'react-router-dom' // Import Link
+import { getDefaultProfileImage } from '../../utils/user'
+import { Link } from 'react-router-dom'
 
 // FileItem Component
 const FileItem: React.FC<{
@@ -79,8 +81,8 @@ export const ProjectDetails: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [project, setProject] = useState<ProjectSchema | null>(null)
   const [tasks, setTasks] = useState<TaskSchema[]>([])
-  const [users, setUsers] = useState<{ [key: string]: { name: string, profileImage?: string } }>({}) // Corrected type
-  const [attachments, setAttachments] = useState<any[]>([]); // Store attachments
+  const [users, setUsers] = useState<{ [key: string]: { name: string, profileImage?: string } }>({})
+  const [attachments, setAttachments] = useState<any[]>([]);
 
   // Load project data
   useEffect(() => {
@@ -93,27 +95,15 @@ export const ProjectDetails: React.FC = () => {
         setIsLoading(true)
         setError(null)
 
-        // Fetch project details
         const projectData = await projectService.getProjectById(projectId)
-
-        // Fetch project tasks
-        const tasksResponse = await taskService.fetchTasks({
-          projectId: projectId
-        })
-
-        // Fetch users
+        const tasksResponse = await taskService.fetchTasks({ projectId: projectId })
         const usersResponse = await userManagementService.fetchUsers()
-        console.log("Fetched users:", usersResponse); // Debug log
 
-        // Create users map
         const userMap = usersResponse.data.reduce((acc, user) => {
-          acc[user.id] = { name: user.name, profileImage: user.profileImage }; // Include profileImage
+          acc[user.id] = { name: user.name, profileImage: user.profileImage };
           return acc;
-        }, {} as { [key: string]: { name: string; profileImage?: string } }) // Corrected type
-        setUsers(userMap)
+        }, {} as { [key: string]: { name: string; profileImage?: string } })
 
-
-        // Fetch project messages and extract attachments
         const projectMessages = await projectService.getProjectMessages(projectId);
         const extractedAttachments = projectMessages.reduce((acc: any[], message) => {
           if (message.attachments && message.attachments.length > 0) {
@@ -125,7 +115,7 @@ export const ProjectDetails: React.FC = () => {
         setProject(projectData)
         setTasks(tasksResponse.data)
         setUsers(userMap)
-        setAttachments(extractedAttachments); // Set attachments
+        setAttachments(extractedAttachments);
 
       } catch (err: any) {
         console.error('Error loading project data:', err)
@@ -160,8 +150,6 @@ export const ProjectDetails: React.FC = () => {
     if (!project || !project.managers) {
       return 'Sem gestores';
     }
-
-    // Map manager IDs to names, handling potential missing users
     return project.managers
       .map(managerId => {
         const manager = users[managerId];
@@ -170,7 +158,6 @@ export const ProjectDetails: React.FC = () => {
       .join(', ');
   };
 
-  // Render loading or error states
   if (isLoading) {
     return <Layout role="admin" isLoading={true} />
   }
@@ -236,8 +223,6 @@ export const ProjectDetails: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
-                {/* Progress */}
                 <div className="mt-6">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm text-gray-500">Progresso do Projeto</span>
@@ -264,7 +249,6 @@ export const ProjectDetails: React.FC = () => {
     )
   }
 
-  // Check project access
   if (!canViewProject()) {
     return (
       <Layout role="admin" isLoading={false}>
@@ -278,7 +262,6 @@ export const ProjectDetails: React.FC = () => {
     )
   }
 
-  // No project found
   if (!project) {
     return (
       <Layout role="admin" isLoading={false}>
@@ -292,7 +275,6 @@ export const ProjectDetails: React.FC = () => {
     )
   }
 
-  // Status Badge Component
   const StatusBadge: React.FC<{ status: ProjectSchema['status'] }> = ({ status }) => {
     const statusStyles = {
       planning: 'bg-yellow-100 text-yellow-800',
@@ -404,9 +386,18 @@ export const ProjectDetails: React.FC = () => {
 
         {/* Tasks Section */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <CheckCircle className="mr-2 text-blue-600" /> Tarefas do Projeto
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold flex items-center">
+              <CheckCircle className="mr-2 text-blue-600" /> Tarefas do Projeto
+            </h2>
+            {/* Create Task Button - Link to the new page */}
+            <Link
+              to={`/admin/projects/${projectId}/create-task`}
+              className="bg-blue-600 text-white px-3 py-1 rounded-full hover:bg-blue-700 transition flex items-center"
+            >
+              <Plus size={20} />
+            </Link>
+          </div>
 
           {tasks.length === 0 ? (
             <p className="text-gray-500 text-center">Nenhuma tarefa encontrada</p>
@@ -419,10 +410,18 @@ export const ProjectDetails: React.FC = () => {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-medium text-gray-900">
-                      <Link to={`/tasks/${task.id}`} className="hover:underline"> {/* Link to TaskDetails */}
+                      <Link to={`/tasks/${task.id}`} className="hover:underline">
                         {task.title}
                       </Link>
                     </h3>
+                    {/* Add Edit Icon Here */}
+                    <Link
+                        to={`/admin/projects/${projectId}/edit-task/${task.id}`}
+                        className="text-blue-500 hover:text-blue-700"
+                        title="Editar Tarefa"
+                    >
+                        <Edit size={20} />
+                    </Link>
                     <span className={`
                       px-2 py-1 rounded-full text-xs
                       ${task.status === 'completed'

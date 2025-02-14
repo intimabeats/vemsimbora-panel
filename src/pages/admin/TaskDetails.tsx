@@ -27,7 +27,7 @@ import {
 import { pulseKeyframes } from '../../utils/animation';
 import { getDefaultProfileImage } from '../../utils/user';
 import { AttachmentDisplay } from '../../components/AttachmentDisplay';
-import { useAuth } from '../../context/AuthContext'; // Corrected import
+import { useAuth } from '../../context/AuthContext';
 
 
 export const TaskDetails: React.FC = () => {
@@ -105,10 +105,26 @@ export const TaskDetails: React.FC = () => {
     // NEW: Handle submitting task for approval
     const handleSubmitForApproval = async () => {
         try {
-            await taskService.updateTask(taskId!, { status: 'waiting_approval' });
-            // Refresh task data after status update
-            const updatedTask = await taskService.getTaskById(taskId!);
+            const updatedTask = await taskService.updateTask(taskId!, { status: 'waiting_approval' });
             setTask(updatedTask);
+
+            // Add system message to project chat
+            if (updatedTask) {
+                await projectService.addSystemMessageToProjectChat(
+                    updatedTask.projectId,
+                    {
+                        userId: 'system', // System user
+                        userName: 'Sistema',
+                        content: `A tarefa "${updatedTask.title}" foi enviada para aprovação por ${users[updatedTask.assignedTo]?.name || 'Usuário Desconhecido'}.`,
+                        timestamp: Date.now(),
+                        messageType: 'task_submission', // Important for identifying the message later
+                        quotedMessage: { // Include a quoted message with a link
+                            userName: 'Sistema',
+                            content: `Tarefa: ${updatedTask.title} - [Ver Tarefa](/tasks/${updatedTask.id})`,
+                        },
+                    }
+                );
+            }
         } catch (error) {
             console.error("Error submitting for approval:", error);
             setError("Failed to submit the task for approval.");
@@ -116,26 +132,68 @@ export const TaskDetails: React.FC = () => {
     };
 
     // NEW: Handle task completion (approval) - FOR ADMIN/MANAGER
-    const handleCompleteTask = async () => {
-        try {
-            await taskService.updateTask(taskId!, { status: 'completed' });
-            setStatusChanged(true); // Trigger pulse animation
-            setShowConfetti(true);   // Show confetti
-            setTimeout(() => {
-                setStatusChanged(false);
-                setFadeOut(true); // Start fade-out animation
-                setTimeout(() => setShowConfetti(false), 1000); //  Hide after fade-out (1s)
-            }, 4000); //  Confetti visible for 4 seconds
+   const handleCompleteTask = async () => {
+    try {
+      const updatedTask = await taskService.updateTask(taskId!, { status: 'completed' });
+      setTask(updatedTask);
+      setStatusChanged(true);
+      setShowConfetti(true);
+      setTimeout(() => {
+        setStatusChanged(false);
+        setFadeOut(true);
+        setTimeout(() => setShowConfetti(false), 1000);
+      }, 4000);
 
-            // Refresh task data after status update
-            const updatedTask = await taskService.getTaskById(taskId!);
-            setTask(updatedTask);
+      if (updatedTask) {
+        const projectMessages = await projectService.getProjectMessages(updatedTask.projectId);
+        const submissionMessage: any = projectMessages.find( // Explicitly type as any
+          (msg: any) => msg.messageType === 'task_submission' && msg.quotedMessage?.content.includes(`/tasks/${updatedTask.id}`)
+        );
 
-        } catch (error) {
-            console.error("Error completing task:", error);
-            setError("Failed to complete the task."); // Set an error message
+        if (submissionMessage) {
+          // Format dates
+          const submittedAt = new Date(submissionMessage.timestamp).toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          const approvedAt = new Date().toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+
+          // Construct the updated message
+          const updatedContent = `A tarefa "${updatedTask.title}" foi enviada para aprovação por ${users[updatedTask.assignedTo]?.name || 'Usuário Desconhecido'} no dia ${submittedAt}, e aprovada por ${currentUser?.displayName || 'Administrador'} no dia ${approvedAt}.`;
+
+          await projectService.addSystemMessageToProjectChat(
+            updatedTask.projectId,
+            {
+              userId: 'system',
+              userName: 'Sistema',
+              content: updatedContent, // Use the formatted content
+              timestamp: Date.now(),
+              messageType: 'task_approval',
+              originalMessageId: submissionMessage.id,
+              quotedMessage: {
+                userName: 'Sistema',
+                content: `Tarefa: ${updatedTask.title} - [Ver Tarefa](/tasks/${updatedTask.id})`,
+              },
+            }
+          );
+        } else {
+          console.warn("Could not find original submission message to update.");
         }
-    };
+      }
+    } catch (error) {
+      console.error("Error completing task:", error);
+      setError("Failed to complete the task."); // Set an error message
+    }
+  };
 
      // Handle reverting task to pending
     const handleRevertToPending = async () => {
@@ -193,7 +251,7 @@ export const TaskDetails: React.FC = () => {
 
 
   return (
-    <Layout role="admin">
+    <Layout role={currentUser?.role || 'employee'}>
       <style>{pulseKeyframes}</style>
       <div className="container mx-auto p-6">
       {showConfetti && <Confetti onConfettiComplete={() => setFadeOut(false)}  className={fadeOut ? 'fade-out-confetti' : ''} />}
