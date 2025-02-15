@@ -1,3 +1,4 @@
+// src/services/ProjectService.ts
 import {
   getFirestore,
   collection,
@@ -15,6 +16,7 @@ import {
 } from 'firebase/firestore'
 import { auth } from '../config/firebase'
 import { ProjectSchema } from '../types/firestore-schema'
+import { activityService } from './ActivityService'; // Import
 
 export class ProjectService {
   private db = getFirestore()
@@ -41,6 +43,17 @@ export class ProjectService {
       }
 
       await setDoc(projectRef, newProject)
+
+      // Log activity
+      await activityService.logActivity({
+        userId: auth.currentUser?.uid || '',
+        userName: auth.currentUser?.displayName || 'Unknown User',
+        type: 'project_created',
+        projectId: newProject.id,
+        projectName: newProject.name, // Store the project NAME
+      });
+
+
       return newProject
     } catch (error) {
       console.error('Erro ao criar projeto:', error)
@@ -156,7 +169,18 @@ async addSystemMessageToProjectChat(
 
       // Fetch and return updated project
       const updatedDoc = await getDoc(projectRef)
-      return { id: updatedDoc.id, ...updatedDoc.data() } as ProjectSchema
+      const updatedProjectData =  { id: updatedDoc.id, ...updatedDoc.data() } as ProjectSchema
+
+      // Log activity for project update
+      await activityService.logActivity({
+        userId: auth.currentUser?.uid || '',
+        userName: auth.currentUser?.displayName || 'Unknown User',
+        type: 'project_updated',
+        projectId: projectId,
+        projectName: updatedProjectData.name, // Use updated name
+        details: `Project updated.`, // You can add more details here if needed
+      });
+      return updatedProjectData
     } catch (error) {
       console.error('Erro ao atualizar projeto:', error)
       throw error

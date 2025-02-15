@@ -1,3 +1,4 @@
+// src/pages/admin/ProjectChat.tsx
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
@@ -34,16 +35,10 @@ interface MessageType {
   quotedMessage?: {
     userName: string;
     content: string;
-    attachments?: {
-      id: string;
-      name: string;
-      url: string;
-      type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio';
-      size?: number;
-    }[];
+    attachments?: any[];
   }
-  originalMessageId?: string; // ID of the original submission message (for updates)
-  messageType?: 'task_submission' | 'task_approval' | 'general'; // Type of message
+  originalMessageId?: string; // Add originalMessageId
+  messageType?: 'task_submission' | 'task_approval' | 'general'; // Add messageType
 }
 
 // Functional component for the Managers Modal
@@ -81,6 +76,8 @@ export const ProjectChat: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null); // Ref for the input field
+  const headerRef = useRef<HTMLDivElement>(null); // Ref for the header
+  const inputAreaRef = useRef<HTMLDivElement>(null); // Ref for the input area
 
 
   const [isLoading, setIsLoading] = useState(true)
@@ -264,7 +261,35 @@ export const ProjectChat: React.FC = () => {
       setIsDeleteModalOpen(false);
       setMessageToDelete(null);
     }
-  };
+  }
+
+  // Dynamic height calculation
+    useEffect(() => {
+        const resizeObserver = new ResizeObserver(() => {
+            if (chatContainerRef.current && headerRef.current && inputAreaRef.current) {
+                const headerHeight = headerRef.current.offsetHeight;
+                const inputAreaHeight = inputAreaRef.current.offsetHeight;
+                const windowHeight = window.innerHeight;
+
+                // Calculate available height for chat container
+                const chatContainerHeight = windowHeight - headerHeight - inputAreaHeight;
+
+                chatContainerRef.current.style.height = `${chatContainerHeight}px`;
+                chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight; // Scroll to bottom
+            }
+        });
+
+        if (chatContainerRef.current) {
+            resizeObserver.observe(chatContainerRef.current);
+        }
+
+        return () => {
+            if (chatContainerRef.current) {
+                resizeObserver.unobserve(chatContainerRef.current);
+            }
+        };
+    }, []);
+
 
   if (isLoading) {
     return <Layout role="admin" isLoading={true} />
@@ -292,7 +317,7 @@ export const ProjectChat: React.FC = () => {
     <Layout role={currentUser?.role || 'employee'}>
       <div className="flex flex-col h-screen">
         {/* Fixed Header */}
-        <div  className="bg-white shadow-md p-4 flex-shrink-0">
+        <div ref={headerRef}  className="bg-white shadow-md p-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <button
               onClick={() => navigate(`/admin/projects/${projectId}`)}
@@ -326,7 +351,7 @@ export const ProjectChat: React.FC = () => {
         <div
             className="flex-1 overflow-y-auto bg-gray-50 p-4"
             ref={chatContainerRef}
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+
         >
           {messages.map((message, index) => (
             <Message
@@ -344,7 +369,7 @@ export const ProjectChat: React.FC = () => {
         </div>
 
         {/*  Input Area */}
-        <div  className="bg-white p-4 shadow-md flex-shrink-0">
+        <div ref={inputAreaRef} className="bg-white p-4 shadow-md flex-shrink-0 sticky bottom-0">
           {/* Quoted Message Display */}
           {quotedMessage && (
             <div className="mb-4 p-3 bg-gray-100 rounded-lg flex items-center justify-between">

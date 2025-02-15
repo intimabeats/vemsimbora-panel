@@ -1,3 +1,4 @@
+// src/pages/admin/Dashboard.tsx
 import React, { useState, useEffect } from 'react'
 import { Layout } from '../../components/Layout'
 import {
@@ -7,14 +8,14 @@ import {
   CheckCircle,
   AlertTriangle,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
-import { userManagementService } from '../../services/UserManagementService' // Corrected import
+import { userManagementService } from '../../services/UserManagementService'
 import { taskService } from '../../services/TaskService'
 import { activityService } from '../../services/ActivityService';
 import { ActivityLogSchema, ProjectSchema, TaskSchema } from '../../types/firestore-schema';
-
+import { useAuth } from '../../context/AuthContext';
 
 const StatCard: React.FC<{
   icon: React.ElementType,
@@ -22,8 +23,8 @@ const StatCard: React.FC<{
   value: string | number,
   color: string
 }> = ({ icon: Icon, title, value, color }) => (
-  <div className="bg-white p-4 rounded-xl shadow-md flex items-center space-x-4">
-    <div className={`p-3 rounded-full ${color} bg-opacity-10`}>
+  <div className={`bg-white p-4 rounded-xl shadow-md flex items-center space-x-4 border border-${color.split('-')[1]}-100`}>
+    <div className={`p-3 rounded-full ${color} bg-opacity-20`}>
       <Icon className={`${color} w-6 h-6`} />
     </div>
     <div>
@@ -93,6 +94,7 @@ export const AdminDashboard: React.FC = () => {
   const [recentActivities, setRecentActivities] = useState<ActivityLogSchema[]>([]); // Use the new type
   const [error, setError] = useState<string | null>(null);
     const [projectsWithTasks, setProjectsWithTasks] = useState<{ project: ProjectSchema; tasks: TaskSchema[] }[]>([]);
+    const { currentUser } = useAuth();
 
 
   useEffect(() => {
@@ -127,7 +129,6 @@ export const AdminDashboard: React.FC = () => {
         const projectsWithTasksResult = await Promise.all(projectsWithTasksPromises);
         setProjectsWithTasks(projectsWithTasksResult);
 
-
       } catch (err: any) {
         setError(err.message || 'Erro ao buscar dados.');
         console.error("Error fetching data:", err);
@@ -137,12 +138,14 @@ export const AdminDashboard: React.FC = () => {
     };
 
     fetchData();
-  }, [currentPage]); // Add currentPage as a dependency
+  }, [currentPage, currentUser]); // Add currentPage as a dependency
+
 
   return (
     <Layout role="admin" isLoading={isLoading}>
       <div className="container mx-auto p-6">
         <div className="space-y-6">
+          
           <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Dashboard</h1>
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
@@ -243,8 +246,13 @@ export const AdminDashboard: React.FC = () => {
                     <div>
                       <p className="font-medium text-gray-700 text-sm">{activity.userName}</p>
                       <p className="text-xs text-gray-500">
-                        {activity.type} {activity.projectId ? `no projeto ${activity.projectId}` : ''}
-                        {activity.taskId ? `na tarefa ${activity.taskId}`: ''}
+                        {activity.type === 'project_created' && `Criou o projeto ${activity.projectName}`}
+                        {activity.type === 'project_updated' && `Atualizou o projeto ${activity.projectName}`}
+                        {activity.type === 'task_created' && `Criou a tarefa ${activity.taskName} no projeto ${activity.projectName}`}
+                        {activity.type === 'task_updated' && `Atualizou a tarefa ${activity.taskName} no projeto ${activity.projectName}`}
+                        {activity.type === 'task_completed' && `Completou a tarefa ${activity.taskName} no projeto ${activity.projectName}`}
+                        {activity.type === 'task_status_update' && `Alterou o status da tarefa ${activity.taskName} para ${activity.newStatus}`}
+                        {/* Add more activity types as needed */}
                       </p>
                     </div>
                     <span className="text-xs text-gray-400">

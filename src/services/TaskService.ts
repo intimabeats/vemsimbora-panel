@@ -1,3 +1,4 @@
+// src/services/TaskService.ts
 import {
   getFirestore,
   collection,
@@ -20,6 +21,8 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { notificationService } from './NotificationService' // Import NotificationService
 import { projectService } from './ProjectService'
 import { userManagementService } from './UserManagementService'
+import { activityService } from './ActivityService'; // Import ActivityService
+
 
 export class TaskService {
   private db = getFirestore()
@@ -51,6 +54,19 @@ export class TaskService {
       }
 
       await setDoc(taskRef, newTask)
+
+      // Log activity
+      const projectData = await projectService.getProjectById(newTask.projectId); // Fetch project data
+      await activityService.logActivity({
+        userId: auth.currentUser?.uid || '',
+        userName: auth.currentUser?.displayName || 'Unknown User',
+        type: 'task_created',
+        projectId: newTask.projectId,
+        projectName: projectData.name, // Use project name
+        taskId: newTask.id,
+        taskName: newTask.title, // Use task name
+      });
+
       return newTask
     } catch (error) {
       console.error('Erro ao criar tarefa:', error)
@@ -123,6 +139,31 @@ export class TaskService {
             );
           }
         }
+        // Log activity for task status update
+        await activityService.logActivity({
+          userId: auth.currentUser?.uid || '',
+          userName: auth.currentUser?.displayName || 'Unknown User',
+          type: 'task_status_update',
+          projectId: updatedTaskData.projectId,
+          projectName: projectData.name,
+          taskId: taskId,
+          taskName: updatedTaskData.title,
+          newStatus: updatedTaskData.status, // Log the new status
+          details: `Task status changed from ${previousTaskData.status} to ${updatedTaskData.status}`,
+        });
+      } else {
+          // Log activity for general task update (if not a status change)
+          const projectData = await projectService.getProjectById(updatedTaskData.projectId);
+          await activityService.logActivity({
+              userId: auth.currentUser?.uid || '',
+              userName: auth.currentUser?.displayName || 'Unknown User',
+              type: 'task_updated',
+              projectId: updatedTaskData.projectId,
+              projectName: projectData.name,
+              taskId: taskId,
+              taskName: updatedTaskData.title,
+              details: `Task updated.`, // You can add more details here
+          });
       }
 
       return updatedTaskData;

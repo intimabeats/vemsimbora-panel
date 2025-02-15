@@ -1,3 +1,4 @@
+// src/pages/Profile.tsx
 import React, { useState, useEffect, useRef } from 'react'
 import {
   User,
@@ -7,13 +8,15 @@ import {
   Save,
   Camera,
   X,
-  AlertTriangle
+  AlertTriangle,
+    Loader2,
+    FileEdit // new icon
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { AuthService } from '../config/firebase'
 import { useNavigate } from 'react-router-dom'
-import { storage } from '../config/firebase'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { storage } from '../config/firebase' // Import storage
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage' // Import storage functions
 import { Validation } from '../utils/validation'
 import { Layout } from '../components/Layout'
 import { userManagementService } from '../services/UserManagementService' // Import
@@ -22,6 +25,8 @@ export const Profile: React.FC = () => {
   const { currentUser, logout, setCurrentUser } = useAuth()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const coverPhotoInputRef = useRef<HTMLInputElement>(null); // Ref for cover photo input
+
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')  // Email is read-only
@@ -30,18 +35,46 @@ export const Profile: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [coverImage, setCoverImage] = useState<string>(''); // New state for cover image
+  const [isUploadingCover, setIsUploadingCover] = useState(false); // New state for cover upload
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null); // New state for cover upload errors
+  const [bio, setBio] = useState(''); // New state for the bio
+
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    if (currentUser) {
-      setName(currentUser.displayName || '')
-      setEmail(currentUser.email || '')
-      setProfileImage(currentUser.photoURL || null)
-    }
-  }, [currentUser])
+    useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            setError('');
+
+            try {
+                if (currentUser) {
+                    setName(currentUser.displayName || '');
+                    setEmail(currentUser.email || '');
+                    setProfileImage(currentUser.photoURL || null);
+
+                    const userData = await userManagementService.getUserById(currentUser.uid);
+                    if (userData) {
+                        setCoverImage(userData.coverImage || 'linear-gradient(to right, #4c51bf, #6a82fb)');
+                        if (userData.bio) {
+                            setBio(userData.bio);
+                        }
+                    }
+                }
+            } catch (err: any) {
+                setError(err.message || 'Failed to load profile data.');
+                console.error("Error fetching user data:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [currentUser?.uid]); // Correct dependency
+
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -75,9 +108,44 @@ export const Profile: React.FC = () => {
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer upload da imagem')
     } finally {
-      setIsUploading(false)
+      setIsUploading(false) // Set loading to false after upload (success or failure)
     }
   }
+
+  const handleCoverImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!Validation.isValidFileType(file, ['image/jpeg', 'image/png'])) {
+      setCoverUploadError('Formato de imagem inválido. Use JPEG ou PNG.');
+      return;
+    }
+
+    if (!Validation.isValidFileSize(file, 5)) {
+      setCoverUploadError('Imagem muito grande. O tamanho máximo é 5MB.');
+      return;
+    }
+
+    setIsUploadingCover(true);
+    setCoverUploadError(null); // Clear previous errors
+    try {
+      const storageRef = ref(storage, `users/${currentUser!.uid}/coverImage`);
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+      setCoverImage(downloadURL);
+
+      // Update user's profile with the new cover photo URL
+      await userManagementService.updateUser(currentUser!.uid, { coverImage: downloadURL });
+      // Optionally update the currentUser context if you want immediate reflection
+      setCurrentUser(prevUser => prevUser ? { ...prevUser, coverImage: downloadURL } : null);
+      setSuccess('Imagem de capa atualizada!');
+
+    } catch (err: any) {
+      setCoverUploadError(err.message || 'Erro ao fazer upload da imagem de capa.');
+    } finally {
+      setIsUploadingCover(false); // Set loading to false after upload (success or failure)
+    }
+  };
 
   const validatePasswords = () => {
     if (newPassword !== confirmPassword) {
@@ -137,6 +205,10 @@ export const Profile: React.FC = () => {
       if (name !== currentUser?.displayName) {
         updates.name = name
       }
+      //NEW
+      if (bio !== currentUser?.bio) {
+          updates.bio = bio;
+      }
 
       // Update profile (name and potentially photoURL)
       await AuthService.updateProfile(currentUser!.uid, updates)
@@ -148,7 +220,7 @@ export const Profile: React.FC = () => {
     } catch (err: any) {
       setError(err.message || 'Erro ao atualizar perfil')
     } finally {
-      setIsLoading(false)
+      setIsLoading(false) // Set loading to false after update (success or failure)
     }
   }
 
@@ -174,6 +246,46 @@ export const Profile: React.FC = () => {
             >
               <X size={24} />
             </button>
+          </div>
+          {/* Cover Photo Section */}
+          <div className="relative w-full h-48 bg-gray-200 rounded-xl overflow-hidden">
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: coverImage.startsWith('linear-gradient')
+                  ? coverImage
+                  : `url(${coverImage})`,
+              }}
+            >
+              {/* Semi-transparent overlay (only if it's an image) */}
+              {!coverImage.startsWith('linear-gradient') && (
+                <div className="absolute inset-0 bg-black opacity-30"></div>
+              )}
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              ref={coverPhotoInputRef}
+              onChange={handleCoverImageUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => coverPhotoInputRef.current?.click()}
+              className="absolute top-4 right-4 bg-white bg-opacity-75 text-gray-700 p-2 rounded-full hover:bg-opacity-100 transition-colors"
+              title="Change Cover Photo"
+            >
+              <Camera size={20} />
+            </button>
+            {isUploadingCover && (
+              <div className="absolute top-1/2 right-4 transform -translate-y-1/2">
+                <Loader2 className="animate-spin text-white" size={20} />
+              </div>
+            )}
+            {coverUploadError && (
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded">
+                {coverUploadError}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -220,6 +332,19 @@ export const Profile: React.FC = () => {
                       className="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
                     />
                   </div>
+                </div>
+
+                <div>
+                    <label htmlFor="bio" className="block text-gray-700 mb-2 flex items-center">
+                        <FileEdit className="mr-2 text-gray-500" size={20} /> Bio
+                    </label>
+                    <textarea
+                        id="bio"
+                        value={bio}
+                        onChange={(e) => setBio(e.target.value)}
+                        placeholder="A short description about yourself..."
+                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-24 resize-none" // Added resize-none
+                    />
                 </div>
 
                 <div className="grid grid-cols-2 gap-6">

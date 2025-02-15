@@ -20,6 +20,7 @@ import { Notifications } from './pages/Notifications'
 import { TaskDetails } from './pages/admin/TaskDetails'
 import { CreateActionTemplate } from './pages/admin/CreateActionTemplate'
 import { ActionTemplateManagement } from './pages/admin/ActionTemplateManagement'
+import { UserProfile } from './pages/UserProfile'; // Import UserProfile
 
 
 // Admin Imports
@@ -56,6 +57,15 @@ const App: React.FC = () => {
               element={
                 <PrivateRoute>
                   <Profile />
+                </PrivateRoute>
+              }
+            />
+            {/* Rota de Perfil do Usuário (com ID) */}
+            <Route
+              path="/profile/:userId"  // NEW: User profile route with ID
+              element={
+                <PrivateRoute>
+                  <UserProfile />
                 </PrivateRoute>
               }
             />

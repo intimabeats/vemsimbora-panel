@@ -1,3 +1,4 @@
+// src/components/Message.tsx
 import React from 'react'
 import { Trash2, CornerDownLeft } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -42,7 +43,7 @@ export const Message: React.FC<MessageProps> = ({ message, onDelete, onQuote, is
 
   return (
     <div
-      className={`group flex items-start gap-3 mb-4 px-4 ${ // Added px-4 here
+      className={`group flex items-start gap-3 mb-4 ${ // Added px-4 here
         isCurrentUserMessage ? 'flex-row-reverse' : ''
       } ${isFirstMessage ? 'mt-4' : ''}`}
     >

@@ -1,16 +1,18 @@
 // User Schema
-    export interface UserSchema {
-      id: string
-      name: string
-      email: string
-      role: 'admin' | 'manager' | 'employee'
-      status: 'active' | 'inactive' | 'suspended'
-      coins: number
-      createdAt: number
-      updatedAt: number
-      profileImage?: string
-      lastLogin?: number
-    }
+export interface UserSchema {
+  id: string
+  name: string
+  email: string
+  role: 'admin' | 'manager' | 'employee'
+  status: 'active' | 'inactive' | 'suspended'
+  coins: number
+  createdAt: number
+  updatedAt: number
+  profileImage?: string
+  coverImage?: string; // Add coverImage
+  lastLogin?: number
+  bio?: string;       // NEW: Add bio field
+}
 
     // Project Schema
     export interface ProjectSchema {
@@ -131,13 +133,16 @@ export interface ActionTemplateSchema {
     }
 
     // Activity Log Schema
-    export interface ActivityLogSchema {
-      id: string;
-      userId: string;
-      userName: string;
-      type: 'project_created' | 'project_updated' | 'task_created' | 'task_updated' | 'task_completed' | 'user_login' | 'user_created' | 'other'; // Add other types as needed
-      projectId?: string; // Optional, if related to a project
-      taskId?: string;    // Optional, if related to a task
-      details?: string;   // Optional, for additional details
-      timestamp: number;
-    }
+export interface ActivityLogSchema {
+  id: string;
+  userId: string;
+  userName: string;
+  type: 'project_created' | 'project_updated' | 'task_created' | 'task_updated' | 'task_completed' | 'user_login' | 'user_created' | 'task_status_update' | 'other'; // Added task_status_update
+  projectId?: string; // Optional, if related to a project
+  taskId?: string;    // Optional, if related to a task
+  projectName?: string; // NEW: Project name for easier display
+  taskName?: string;    // NEW: Task name for easier display
+  newStatus?: string;   // NEW: For status updates
+  details?: string;   // Optional, for additional details
+  timestamp: number;
+}

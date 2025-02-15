@@ -1,3 +1,4 @@
+// src/services/ActivityService.ts
 import {
   getFirestore,
   collection,
@@ -22,8 +23,6 @@ class ActivityService {
       console.log("Activity logged with ID: ", docRef.id);
     } catch (error) {
       console.error("Error logging activity:", error);
-      // In a production app, you might want to handle this error more gracefully
-      // (e.g., retry, send to an error reporting service).  For now, we'll re-throw.
       throw error;
     }
   }
