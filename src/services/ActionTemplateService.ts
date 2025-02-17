@@ -1,3 +1,4 @@
+// src/services/ActionTemplateService.ts
 import {
   getFirestore,
   collection,
@@ -9,7 +10,7 @@ import {
   getDoc,
   query,
   orderBy,
-  writeBatch // Import writeBatch
+  writeBatch
 } from 'firebase/firestore'
 import { ActionTemplateSchema } from '../types/firestore-schema'
 
@@ -17,7 +18,6 @@ export class ActionTemplateService {
   private db = getFirestore()
   private templatesCollection = collection(this.db, 'actionTemplates')
 
-  // Create a new action template
   async createActionTemplate(
     templateData: Omit<ActionTemplateSchema, 'id'>
   ): Promise<ActionTemplateSchema> {
@@ -25,12 +25,9 @@ export class ActionTemplateService {
       const templateRef = doc(this.templatesCollection)
       const newTemplate: ActionTemplateSchema = {
         id: templateRef.id,
-        ...templateData
+        ...templateData,
+        order: Date.now(), // Set initial order
       }
-
-      // Assign an initial order (e.g., based on creation time)
-      newTemplate.order = Date.now();
-
       await setDoc(templateRef, newTemplate)
       return newTemplate
     } catch (error) {
@@ -39,8 +36,7 @@ export class ActionTemplateService {
     }
   }
 
-  // Get an action template by ID
-  async getActionTemplateById(templateId: string): Promise<ActionTemplateSchema | null> { // Return type can be null
+  async getActionTemplateById(templateId: string): Promise<ActionTemplateSchema | null> {
     try {
       const templateRef = doc(this.db, 'actionTemplates', templateId)
       const templateSnap = await getDoc(templateRef)
@@ -51,7 +47,7 @@ export class ActionTemplateService {
           ...templateSnap.data()
         } as ActionTemplateSchema
       } else {
-        return null; // Return null if not found
+        return null;
       }
     } catch (error) {
       console.error('Error getting action template:', error)
@@ -59,7 +55,6 @@ export class ActionTemplateService {
     }
   }
 
-  // Update an action template
   async updateActionTemplate(
     templateId: string,
     updates: Partial<ActionTemplateSchema>
@@ -73,7 +68,6 @@ export class ActionTemplateService {
     }
   }
 
-  // Delete an action template
   async deleteActionTemplate(templateId: string): Promise<void> {
     try {
       const templateRef = doc(this.db, 'actionTemplates', templateId)
@@ -84,7 +78,6 @@ export class ActionTemplateService {
     }
   }
 
-    // Fetch all action templates, ordered by 'order'
     async fetchActionTemplates(): Promise<ActionTemplateSchema[]> {
         try {
             const q = query(this.templatesCollection, orderBy('order', 'asc')); // Order by the 'order' field
@@ -99,13 +92,12 @@ export class ActionTemplateService {
         }
     }
 
-    // NEW: Update the order of templates
     async updateTemplateOrder(newOrder: ActionTemplateSchema[]): Promise<void> {
-        const batch = writeBatch(this.db); // Use a batch for atomic updates
+        const batch = writeBatch(this.db);
 
         newOrder.forEach((template, index) => {
             const templateRef = doc(this.db, 'actionTemplates', template.id);
-            batch.update(templateRef, { order: index }); // Add/update an 'order' field
+            batch.update(templateRef, { order: index });
         });
 
         try {

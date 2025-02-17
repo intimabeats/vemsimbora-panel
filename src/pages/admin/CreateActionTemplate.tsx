@@ -1,10 +1,21 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Layout } from '../../components/Layout'
 import { actionTemplateService } from '../../services/ActionTemplateService'
 import { ActionTemplateSchema, TaskAction } from '../../types/firestore-schema'
-import { PlusCircle, Save, XCircle, Plus, Trash2, ChevronLeft, ChevronRight, File, FileText, Type, List, Settings, ArrowUp, ArrowDown } from 'lucide-react' // Added Settings, ArrowUp, ArrowDown
+import { PlusCircle, Save, XCircle, Plus, Trash2, ChevronLeft, ChevronRight, File, FileText, Type, List, Settings, ArrowUp, ArrowDown, FileEdit } from 'lucide-react'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal';
 
+// TipTap Imports
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import LinkExtension from '@tiptap/extension-link';
+import ImageExtension from '@tiptap/extension-image';
+import Placeholder from '@tiptap/extension-placeholder';
+import Underline from '@tiptap/extension-underline';
+import TextStyle from '@tiptap/extension-text-style'
+import { Color } from '@tiptap/extension-color'
+import TextAlign from '@tiptap/extension-text-align' // Import TextAlign
+import { EditorToolbar } from '../../components/ActionView'; // Corrected import
 
 const getActionIcon = (type: TaskAction['type']) => {
   switch (type) {
@@ -16,6 +27,8 @@ const getActionIcon = (type: TaskAction['type']) => {
       return <File size={16} />;
     case 'date':
       return <List size={16} />;
+    case 'document': // Added document type
+      return <FileEdit size={16} />;
     default:
       return null;
   }
@@ -27,7 +40,7 @@ interface ManageTemplatesModalProps {
   onClose: () => void;
   templates: ActionTemplateSchema[];
   onDelete: (id: string) => void;
-  onReorder: (templates: ActionTemplateSchema[]) => void; // Add onReorder
+  onReorder: (templates: ActionTemplateSchema[]) => void;
 }
 
 const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onClose, templates, onDelete, onReorder }) => {
@@ -35,7 +48,6 @@ const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onC
     const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
     const [localTemplates, setLocalTemplates] = useState<ActionTemplateSchema[]>(templates);
 
-    // Update local templates when the prop changes
     useEffect(() => {
         setLocalTemplates(templates);
     }, [templates]);
@@ -45,7 +57,7 @@ const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onC
         const [movedTemplate] = updatedTemplates.splice(fromIndex, 1);
         updatedTemplates.splice(toIndex, 0, movedTemplate);
         setLocalTemplates(updatedTemplates);
-        onReorder(updatedTemplates); // Call onReorder to update the parent state
+        onReorder(updatedTemplates);
     };
 
     if (!isOpen) return null;
@@ -65,7 +77,6 @@ const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onC
             <li key={template.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
               <span>{template.title}</span>
               <div className="flex space-x-2">
-                {/* Move Up */}
                 <button
                     onClick={() => moveTemplate(index, index - 1)}
                     disabled={index === 0}
@@ -75,7 +86,6 @@ const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onC
                     <ArrowUp size={20} />
                 </button>
 
-                {/* Move Down */}
                 <button
                     onClick={() => moveTemplate(index, index + 1)}
                     disabled={index === localTemplates.length - 1}
@@ -101,7 +111,6 @@ const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onC
         </ul>
       </div>
     </div>
-    {/* Delete Confirmation Modal */}
     <DeleteConfirmationModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
@@ -110,7 +119,7 @@ const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onC
         }}
         onConfirm={async () => {
             if (templateToDelete) {
-                await onDelete(templateToDelete); // Call the onDelete prop
+                await onDelete(templateToDelete);
                 setIsDeleteModalOpen(false);
                 setTemplateToDelete(null);
             }
@@ -118,7 +127,7 @@ const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onC
         itemName={
             templateToDelete
                 ? templates.find((t) => t.id === templateToDelete)?.title || "este modelo"
-                : "este modelo" // Fallback in case title is not found
+                : "este modelo"
         }
         warningMessage="Esta ação não poderá ser desfeita."
     />
@@ -137,10 +146,38 @@ export const CreateActionTemplate: React.FC = () => {
   const [success, setSuccess] = useState(false)
   const [templates, setTemplates] = useState<ActionTemplateSchema[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [isManageModalOpen, setIsManageModalOpen] = useState(false); // State for manage modal
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
 
+  // TipTap Editor (one instance)
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      LinkExtension,
+      ImageExtension,
+      Placeholder.configure({
+        placeholder: 'Digite o conteúdo aqui...',
+      }),
+      Underline,
+      TextStyle,
+      Color,
+        TextAlign.configure({
+            types: ['heading', 'paragraph'],
+        }),
+    ],
+    content: '',
+    editable: true,
+    onUpdate: ({ editor }) => {
+      const html = editor.getHTML();
+      // Find the currently edited element and update its 'data'
+      // Assuming ONE document element per step:
+      const currentElementId = elementsByStep[currentStep]?.[0]?.id;
+      if (currentElementId) {
+        handleElementChange(currentElementId, 'data', html);
+      }
+    },
+  });
 
-    const fetchTemplates = async () => {
+    const fetchTemplates = useCallback(async () => {
         try {
             const fetchedTemplates = await actionTemplateService.fetchActionTemplates();
             setTemplates(fetchedTemplates);
@@ -148,11 +185,11 @@ export const CreateActionTemplate: React.FC = () => {
             console.error("Error fetching templates:", error);
             setError("Failed to load templates.");
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchTemplates();
-    }, []);
+    }, [fetchTemplates]);
 
     useEffect(() => {
         const loadTemplate = async () => {
@@ -161,6 +198,7 @@ export const CreateActionTemplate: React.FC = () => {
                     const templateData = await actionTemplateService.getActionTemplateById(selectedTemplate);
                     if (templateData) {
                         setTitle(templateData.title);
+
                         const newElementsByStep: { [step: number]: TaskAction[] } = {};
                         let stepCounter = 1;
                         for (const element of templateData.elements) {
@@ -169,9 +207,15 @@ export const CreateActionTemplate: React.FC = () => {
                             }
                             newElementsByStep[stepCounter].push(element);
                         }
+
                         setElementsByStep(newElementsByStep);
                         setNumSteps(Object.keys(newElementsByStep).length);
                         setCurrentStep(1);
+
+                        // Set initial content for editor
+                        if (templateData.elements[0]?.type === 'document' && templateData.elements[0]?.data) {
+                            editor?.commands.setContent(templateData.elements[0].data);
+                        }
                     }
                 } catch (error) {
                     console.error("Error loading template:", error);
@@ -181,7 +225,7 @@ export const CreateActionTemplate: React.FC = () => {
         };
 
         loadTemplate();
-    }, [selectedTemplate]);
+    }, [selectedTemplate, editor]);
 
 
   const handleAddElement = (type: TaskAction['type']) => {
@@ -190,9 +234,10 @@ export const CreateActionTemplate: React.FC = () => {
       const newElement: TaskAction = {
         id: Date.now().toString(),
         type,
-        title: '',
+        title: '', // Title for all element types
         completed: false,
-        description: '',
+        description: '', // Description for all element types
+        data: type === 'document' ? '' : undefined, // Initialize 'data' for document type
       };
       return {
         ...prev,
@@ -240,7 +285,11 @@ export const CreateActionTemplate: React.FC = () => {
             const allElements: TaskAction[] = [];
             for (let i = 1; i <= numSteps; i++) {
                 if (elementsByStep[i]) {
-                    allElements.push(...elementsByStep[i]);
+                    const stepElements = elementsByStep[i].map(element => ({
+                        ...element,
+                        data: element.data !== undefined ? element.data : null,
+                    }));
+                    allElements.push(...stepElements);
                 }
             }
 
@@ -257,8 +306,7 @@ export const CreateActionTemplate: React.FC = () => {
             setNumSteps(1);
             setCurrentStep(1);
             setSelectedTemplate('');
-            // Refresh templates list
-            await fetchTemplates(); // Re-fetch templates
+            await fetchTemplates();
 
         } catch (err: any) {
             setError(err.message || 'Falha ao criar modelo de ação');
@@ -270,7 +318,6 @@ export const CreateActionTemplate: React.FC = () => {
     const handleDeleteTemplate = async (templateId: string) => {
         try {
             await actionTemplateService.deleteActionTemplate(templateId);
-            // Refresh the templates list after deletion
             await fetchTemplates();
         } catch (error) {
             console.error("Error deleting template:", error);
@@ -278,19 +325,13 @@ export const CreateActionTemplate: React.FC = () => {
         }
     };
 
-    // NEW: Function to handle reordering
     const handleReorderTemplates = async (newTemplatesOrder: ActionTemplateSchema[]) => {
         try {
-            // Update the local state immediately for responsive UI
             setTemplates(newTemplatesOrder);
-
-            // Call the service to update the order in Firestore
             await actionTemplateService.updateTemplateOrder(newTemplatesOrder);
-
         } catch (error) {
             console.error("Error reordering templates:", error);
             setError("Failed to reorder templates.");
-            // Optionally revert to the previous order on error
         }
     };
 
@@ -350,7 +391,6 @@ export const CreateActionTemplate: React.FC = () => {
                 </option>
               ))}
             </select>
-            {/* Manage Templates Button */}
             <button
               onClick={() => setIsManageModalOpen(true)}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
@@ -413,22 +453,35 @@ export const CreateActionTemplate: React.FC = () => {
             <div className="space-y-2">
               {elementsByStep[currentStep]?.map((element, index) => (
                 <div key={element.id} className="border rounded-md p-4 flex items-center">
-                  <span className="mr-2 text-gray-600">
-                    {getActionIcon(element.type)}
-                  </span>
-                  <input
-                    type="text"
-                    value={element.title}
-                    onChange={(e) => handleElementChange(element.id, 'title', e.target.value)}
-                    placeholder={`Título da etapa ${index + 1}`}
-                    className="flex-1 mr-2 px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
-                  />
-                  <textarea
-                    value={element.description || ''}
-                    onChange={(e) => handleElementChange(element.id, 'description', e.target.value)}
-                    placeholder="Descrição da etapa (opcional)"
-                    className="flex-1 mr-2 px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
-                  />
+                    <span className="mr-2 text-gray-600">
+                        {getActionIcon(element.type)}
+                    </span>
+
+                    {element.type === 'document' ? (
+                        <div className="flex-1">
+                            <EditorToolbar editor={editor} />
+                            <div className="tiptap-editor-styles">
+                                <EditorContent editor={editor} />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 mr-2">
+                            <input
+                                type="text"
+                                value={element.title}
+                                onChange={(e) => handleElementChange(element.id, 'title', e.target.value)}
+                                placeholder={`Título da etapa ${index + 1}`}
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                            />
+                            <textarea
+                                value={element.description || ''}
+                                onChange={(e) => handleElementChange(element.id, 'description', e.target.value)}
+                                placeholder="Descrição da etapa (opcional)"
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 mt-2 text-gray-900"
+                            />
+                        </div>
+                    )}
+
                   <button
                     type="button"
                     onClick={() => handleRemoveElement(element.id)}
@@ -474,6 +527,14 @@ export const CreateActionTemplate: React.FC = () => {
               >
                 <Plus className="mr-1" size={16} /> Data
               </button>
+              <button
+                type="button"
+                onClick={() => handleAddElement('document')}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                title="Adicionar editor de documento"
+              >
+                <Plus className="mr-1" size={16} /> Documento
+              </button>
             </div>
           </div>
 
@@ -510,13 +571,12 @@ export const CreateActionTemplate: React.FC = () => {
         </div>
       </div>
 
-      {/* Manage Templates Modal */}
       <ManageTemplatesModal
         isOpen={isManageModalOpen}
         onClose={() => setIsManageModalOpen(false)}
         templates={templates}
         onDelete={handleDeleteTemplate}
-        onReorder={handleReorderTemplates} // Pass the reorder function
+        onReorder={handleReorderTemplates}
       />
     </Layout>
   )

@@ -80,11 +80,11 @@ export interface UserSchema {
 export interface TaskAction {
   id: string;
   title: string;
-  type: 'text' | 'file_upload' | 'approval' | 'date';
+  type: 'text' | 'long_text' | 'file_upload' | 'approval' | 'date' | 'document'; // Add 'document'
   completed: boolean;
   completedAt?: number | null;
-  completedBy?: string | null; // NEW: User ID of who completed the action
-  data?: any;
+  completedBy?: string | null;
+  data?: any; // TipTap will store HTML here
   description?: string;
 }
 

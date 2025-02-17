@@ -1,3 +1,4 @@
+// src/pages/admin/TaskDetails.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Layout } from '../../components/Layout';
@@ -5,14 +6,13 @@ import { taskService } from '../../services/TaskService';
 import { projectService } from '../../services/ProjectService';
 import { userManagementService } from '../../services/UserManagementService';
 import { TaskSchema, TaskAction } from '../../types/firestore-schema';
-import { ActionView } from '../../components/ActionView';
+import { ActionView } from '../../components/ActionView'; // Import ActionView
 import Confetti from 'react-confetti';
 import {
   CheckCircle,
   XCircle,
   Clock,
   File,
-  Paperclip,
   User,
   Calendar,
   Check,
@@ -21,8 +21,8 @@ import {
   AlertTriangle,
   ArrowLeft,
   Loader2,
-  MoreVertical, // For a dropdown menu
-  CornerUpLeft // Icon for "Voltar para Pendente"
+  MoreVertical,
+  CornerUpLeft
 } from 'lucide-react';
 import { pulseKeyframes } from '../../utils/animation';
 import { getDefaultProfileImage } from '../../utils/user';
@@ -31,94 +31,91 @@ import { useAuth } from '../../context/AuthContext';
 
 
 export const TaskDetails: React.FC = () => {
-  const { taskId } = useParams<{ taskId: string }>();
-  const navigate = useNavigate();
-  const [task, setTask] = useState<TaskSchema | null>(null);
-  const [project, setProject] = useState<{ name: string } | null>(null); // Keep for project link, even if not displayed
-  const [users, setUsers] = useState<{ [key: string]: { name: string; profileImage?: string } }>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedAction, setSelectedAction] = useState<TaskAction | null>(null); // Track selected action
-  const [statusChanged, setStatusChanged] = useState(false); // Track status changes
-  const [showConfetti, setShowConfetti] = useState(false); // Control confetti visibility
-  const [fadeOut, setFadeOut] = useState(false); // NEW: Control fade-out animation
-    const { currentUser } = useAuth(); // Get the current user
+  const { taskId } = useParams<{ taskId: string }>()
+  const navigate = useNavigate()
+  const [task, setTask] = useState<TaskSchema | null>(null)
+  const [project, setProject] = useState<{ name: string } | null>(null)
+  const [users, setUsers] = useState<{ [key: string]: { name: string, profileImage?: string } }>({})
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedAction, setSelectedAction] = useState<TaskAction | null>(null)
+  const [statusChanged, setStatusChanged] = useState(false)
+  const [showConfetti, setShowConfetti] = useState(false)
+  const [fadeOut, setFadeOut] = useState(false)
+    const { currentUser } = useAuth();
+    const [isActionViewOpen, setIsActionViewOpen] = useState(false); // NEW: Control ActionView visibility
 
 
   useEffect(() => {
     const loadTask = async () => {
-      setIsLoading(true);
-      setError(null);
+      setIsLoading(true)
+      setError(null)
       try {
         if (!taskId) {
-          throw new Error('O ID da tarefa é obrigatório.');
+          throw new Error('O ID da tarefa é obrigatório.')
         }
-        const fetchedTask = await taskService.getTaskById(taskId);
-        setTask(fetchedTask);
+        const fetchedTask = await taskService.getTaskById(taskId)
+        setTask(fetchedTask)
 
-        const fetchedProject = await projectService.getProjectById(fetchedTask.projectId);
-        setProject({ name: fetchedProject.name });
+        const fetchedProject = await projectService.getProjectById(fetchedTask.projectId)
+        setProject({ name: fetchedProject.name })
 
-        const userIds = [...fetchedTask.assignedTo, fetchedTask.createdBy];
-        const uniqueUserIds = Array.from(new Set(userIds)).filter(Boolean); // Remove duplicates and falsy values
+        const userIds = [...fetchedTask.assignedTo, fetchedTask.createdBy]
+        const uniqueUserIds = Array.from(new Set(userIds)).filter(Boolean)
 
-        const usersData = await userManagementService.fetchUsers({ userIds: uniqueUserIds });
+        const usersData = await userManagementService.fetchUsers({ userIds: uniqueUserIds })
         const userMap = usersData.data.reduce((acc, user) => {
           acc[user.id] = { name: user.name, profileImage: user.profileImage };
           return acc;
-        }, {} as { [key: string]: { name: string; profileImage?: string } });
-        setUsers(userMap);
+        }, {} as { [key: string]: { name: string; profileImage?: string } })
+        setUsers(userMap)
 
       } catch (err: any) {
-        setError(err.message || 'Falha ao carregar a tarefa.');
+        setError(err.message || 'Falha ao carregar a tarefa.')
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
-
-    loadTask();
-  }, [taskId]);
-
-  const handleActionComplete = async (actionId: string, data?: any) => {
-    try {
-      await taskService.completeTaskAction(taskId!, actionId, data);
-      // Refresh task data
-      const updatedTask = await taskService.getTaskById(taskId!);
-      setTask({ ...updatedTask }); // CRITICAL: Create a new object
-      setSelectedAction(null); // Close the action view
-    } catch (error) {
-      console.error('Error completing action:', error);
     }
-  };
+
+    loadTask()
+  }, [taskId])
+
+    const handleActionComplete = async (actionId: string, data?: any) => {
+        try {
+            await taskService.completeTaskAction(taskId!, actionId, data);
+            const updatedTask = await taskService.getTaskById(taskId!);
+            setTask({ ...updatedTask });
+            setSelectedAction(null);
+            setIsActionViewOpen(false); // Close the modal
+        } catch (error) {
+            console.error('Error completing action:', error);
+        }
+    };
 
   const handleActionUncomplete = async (actionId: string) => {
     try {
-      await taskService.uncompleteTaskAction(taskId!, actionId);
-      // Refresh task data.  CRITICAL for reactivity.
-      const updatedTask = await taskService.getTaskById(taskId!);
-      setTask({ ...updatedTask }); // Use spread operator for correct update
+      await taskService.uncompleteTaskAction(taskId!, actionId)
+      const updatedTask = await taskService.getTaskById(taskId!)
+      setTask({ ...updatedTask })
     } catch (error) {
-      console.error('Error uncompleting action:', error);
+      console.error('Error uncompleting action:', error)
     }
-  };
+  }
 
-    // NEW: Handle submitting task for approval
     const handleSubmitForApproval = async () => {
         try {
             const updatedTask = await taskService.updateTask(taskId!, { status: 'waiting_approval' });
             setTask(updatedTask);
-
-            // Add system message to project chat
             if (updatedTask) {
                 await projectService.addSystemMessageToProjectChat(
                     updatedTask.projectId,
                     {
-                        userId: 'system', // System user
+                        userId: 'system',
                         userName: 'Sistema',
                         content: `A tarefa "${updatedTask.title}" foi enviada para aprovação por ${users[updatedTask.assignedTo]?.name || 'Usuário Desconhecido'}.`,
                         timestamp: Date.now(),
-                        messageType: 'task_submission', // Important for identifying the message later
-                        quotedMessage: { // Include a quoted message with a link
+                        messageType: 'task_submission',
+                        quotedMessage: {
                             userName: 'Sistema',
                             content: `Tarefa: ${updatedTask.title} - [Ver Tarefa](/tasks/${updatedTask.id})`,
                         },
@@ -131,7 +128,6 @@ export const TaskDetails: React.FC = () => {
         }
     };
 
-    // NEW: Handle task completion (approval) - FOR ADMIN/MANAGER
    const handleCompleteTask = async () => {
     try {
       const updatedTask = await taskService.updateTask(taskId!, { status: 'completed' });
@@ -146,12 +142,11 @@ export const TaskDetails: React.FC = () => {
 
       if (updatedTask) {
         const projectMessages = await projectService.getProjectMessages(updatedTask.projectId);
-        const submissionMessage: any = projectMessages.find( // Explicitly type as any
+        const submissionMessage: any = projectMessages.find(
           (msg: any) => msg.messageType === 'task_submission' && msg.quotedMessage?.content.includes(`/tasks/${updatedTask.id}`)
         );
 
         if (submissionMessage) {
-          // Format dates
           const submittedAt = new Date(submissionMessage.timestamp).toLocaleString('pt-BR', {
             day: '2-digit',
             month: '2-digit',
@@ -167,7 +162,6 @@ export const TaskDetails: React.FC = () => {
             minute: '2-digit',
           });
 
-          // Construct the updated message
           const updatedContent = `A tarefa "${updatedTask.title}" foi enviada para aprovação por ${users[updatedTask.assignedTo]?.name || 'Usuário Desconhecido'} no dia ${submittedAt}, e aprovada por ${currentUser?.displayName || 'Administrador'} no dia ${approvedAt}.`;
 
           await projectService.addSystemMessageToProjectChat(
@@ -175,7 +169,7 @@ export const TaskDetails: React.FC = () => {
             {
               userId: 'system',
               userName: 'Sistema',
-              content: updatedContent, // Use the formatted content
+              content: updatedContent,
               timestamp: Date.now(),
               messageType: 'task_approval',
               originalMessageId: submissionMessage.id,
@@ -191,11 +185,10 @@ export const TaskDetails: React.FC = () => {
       }
     } catch (error) {
       console.error("Error completing task:", error);
-      setError("Failed to complete the task."); // Set an error message
+      setError("Failed to complete the task.");
     }
   };
 
-     // Handle reverting task to pending
     const handleRevertToPending = async () => {
         try {
             await taskService.updateTask(taskId!, { status: 'pending' });
@@ -208,14 +201,13 @@ export const TaskDetails: React.FC = () => {
     };
 
 
-
   if (isLoading) {
-    return <Layout isLoading={true} />; // Use your loading component
+    return <Layout role={currentUser?.role || 'employee'} isLoading={true} />;
   }
 
   if (error) {
     return (
-      <Layout>
+      <Layout role={currentUser?.role || 'employee'}>
         <div className="p-4 bg-red-100 text-red-700 border border-red-400 rounded flex items-center">
         <AlertTriangle className="mr-2" size={20} />
           {error}
@@ -226,7 +218,7 @@ export const TaskDetails: React.FC = () => {
 
   if (!task) {
     return (
-      <Layout>
+      <Layout role={currentUser?.role || 'employee'}>
         <div className="p-4 bg-yellow-100 text-yellow-700 border border-yellow-400 rounded flex items-center">
           <AlertTriangle className="mr-2" size={20} />
           Tarefa não encontrada.
@@ -239,11 +231,8 @@ export const TaskDetails: React.FC = () => {
   const totalActions = task.actions?.length ?? 0;
   const progress = totalActions > 0 ? (completedActions / totalActions) * 100 : 0;
 
-    // Check if all actions are completed *outside* of event handlers
     const allActionsCompleted = totalActions > 0 && completedActions === totalActions;
 
-
-    // Helper function for consistent date formatting
     const formatDate = (timestamp: number) => {
         return new Date(timestamp).toLocaleDateString('pt-BR');
     };
@@ -256,7 +245,6 @@ export const TaskDetails: React.FC = () => {
       <div className="container mx-auto p-6">
       {showConfetti && <Confetti onConfettiComplete={() => setFadeOut(false)}  className={fadeOut ? 'fade-out-confetti' : ''} />}
         <div className="bg-white rounded-xl shadow-md p-6 space-y-6">
-          {/* Header Section */}
           <div className="flex justify-between items-center">
             <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-blue-600">
               <ArrowLeft size={24} />
@@ -267,7 +255,7 @@ export const TaskDetails: React.FC = () => {
                 task.status === 'completed'
                   ? 'bg-green-100 text-green-800'
                   : task.status === 'waiting_approval'
-                  ? 'bg-purple-100 text-purple-800' // Style for waiting_approval
+                  ? 'bg-purple-100 text-purple-800'
                   : 'bg-yellow-100 text-yellow-800'
               } ${statusChanged ? 'animate-pulse' : ''}`}
             >
@@ -279,7 +267,6 @@ export const TaskDetails: React.FC = () => {
             </span>
           </div>
 
-          {/* Task Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Data de Vencimento</label>
@@ -312,7 +299,6 @@ export const TaskDetails: React.FC = () => {
             </div>
           </div>
 
-          {/* Progress Bar */}
           <div className="w-full bg-gray-200 rounded-full h-2.5">
             <div
               className="bg-blue-600 h-2.5 rounded-full"
@@ -324,13 +310,11 @@ export const TaskDetails: React.FC = () => {
                 <span>Recompensa: {task.coinsReward}</span>
             </div>
 
-          {/* Task Description */}
           <div>
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Descrição</h2>
             <p className="text-gray-600">{task.description}</p>
           </div>
 
-          {/* Actions */}
           <div>
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Ações</h2>
             <div className="space-y-4">
@@ -338,7 +322,6 @@ export const TaskDetails: React.FC = () => {
                 <div key={action.id} className="border rounded-lg p-4 flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-gray-900">{action.title}</h4>
-                    {/* Display the description instead of the type */}
                     <p className="text-sm text-gray-500">{action.description}</p>
                     {action.data && (
                       <p className="text-sm text-gray-500">
@@ -359,7 +342,6 @@ export const TaskDetails: React.FC = () => {
                     )}
                   </div>
                   <div>
-                    {/* Only show action buttons if task is NOT waiting for approval or completed */}
                     {task.status !== 'waiting_approval' && task.status !== 'completed' && (
                         <>
                         {action.completed ? (
@@ -371,7 +353,10 @@ export const TaskDetails: React.FC = () => {
                         </button>
                         ) : (
                         <button
-                            onClick={() => setSelectedAction(action)}
+                            onClick={() => {
+                                setSelectedAction(action);
+                                setIsActionViewOpen(true); // Open the modal
+                            }}
                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                         >
                             Completar
@@ -388,24 +373,22 @@ export const TaskDetails: React.FC = () => {
             </div>
           </div>
 
-            {/* Attachments */}
             {task.attachments && task.attachments.length > 0 && (
                 <div>
                     <h2 className="text-xl font-semibold text-gray-800 mb-4">Anexos</h2>
                     <div className='flex gap-2'>
                         {task.attachments.map((attachmentUrl, index) => (
                             <AttachmentDisplay  key={index} attachment={{
-                                id: index.toString(), //  ID is required by your component
-                                name: attachmentUrl.substring(attachmentUrl.lastIndexOf('/') + 1), // Extract filename
+                                id: index.toString(),
+                                name: attachmentUrl.substring(attachmentUrl.lastIndexOf('/') + 1),
                                 url: attachmentUrl,
-                                type: 'other', // You'll need to determine the actual type
+                                type: 'other',
                             }} />
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* "Submit for Approval" Button - Conditionally Rendered */}
             {allActionsCompleted && task.status !== 'waiting_approval' && task.status !== 'completed' && (
                 <button
                     onClick={handleSubmitForApproval}
@@ -416,7 +399,6 @@ export const TaskDetails: React.FC = () => {
                 </button>
             )}
 
-            {/* "Approve Task" Button - For Admin/Manager, only when waiting_approval */}
             {currentUser?.role === 'admin' && task.status === 'waiting_approval' && (
                 <button
                     onClick={handleCompleteTask}
@@ -426,7 +408,6 @@ export const TaskDetails: React.FC = () => {
                     Aprovar Tarefa ({task.coinsReward} Moedas)
                 </button>
             )}
-            {/* "Revert to Pending" Button - For Admin, only when waiting_approval */}
             {currentUser?.role === 'admin' && task.status === 'waiting_approval' && (
                 <button
                     onClick={handleRevertToPending}
@@ -437,18 +418,18 @@ export const TaskDetails: React.FC = () => {
                 </button>
             )}
 
-          {/* Selected Action (Modal-like) */}
+          {/* ActionView Modal */}
           {selectedAction && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-                <ActionView
-                  action={selectedAction}
-                  onComplete={handleActionComplete}
-                  onCancel={() => setSelectedAction(null)}
-                  taskId={taskId!}
-                />
-              </div>
-            </div>
+            <ActionView
+              action={selectedAction}
+              onComplete={handleActionComplete}
+              onCancel={() => {
+                setSelectedAction(null);
+                setIsActionViewOpen(false); // Close on cancel
+              }}
+              taskId={taskId!}
+              isOpen={isActionViewOpen} // Control visibility
+            />
           )}
         </div>
       </div>
