@@ -1,3 +1,4 @@
+// src/pages/admin/CreateActionTemplate.tsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout } from '../../components/Layout'
 import { actionTemplateService } from '../../services/ActionTemplateService'
@@ -5,7 +6,7 @@ import { ActionTemplateSchema, TaskAction } from '../../types/firestore-schema'
 import { PlusCircle, Save, XCircle, Plus, Trash2, ChevronLeft, ChevronRight, File, FileText, Type, List, Settings, ArrowUp, ArrowDown, FileEdit } from 'lucide-react'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal';
 
-// TipTap Imports
+// TipTap Imports -  KEEP, but we won't use the editor *here*
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import LinkExtension from '@tiptap/extension-link';
@@ -14,8 +15,8 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import TextStyle from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
-import TextAlign from '@tiptap/extension-text-align' // Import TextAlign
-import { EditorToolbar } from '../../components/ActionView'; // Corrected import
+import TextAlign from '@tiptap/extension-text-align'
+import { EditorToolbar } from '../../components/ActionView'; // Keep the import, but we won't use it directly here
 
 const getActionIcon = (type: TaskAction['type']) => {
   switch (type) {
@@ -27,7 +28,7 @@ const getActionIcon = (type: TaskAction['type']) => {
       return <File size={16} />;
     case 'date':
       return <List size={16} />;
-    case 'document': // Added document type
+    case 'document':
       return <FileEdit size={16} />;
     default:
       return null;
@@ -148,7 +149,7 @@ export const CreateActionTemplate: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
 
-  // TipTap Editor (one instance)
+  // TipTap Editor (Keep the instance, but don't use it directly in the render)
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -165,15 +166,9 @@ export const CreateActionTemplate: React.FC = () => {
         }),
     ],
     content: '',
-    editable: true,
+    editable: true, // Keep it editable, even if we don't render it
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
-      // Find the currently edited element and update its 'data'
-      // Assuming ONE document element per step:
-      const currentElementId = elementsByStep[currentStep]?.[0]?.id;
-      if (currentElementId) {
-        handleElementChange(currentElementId, 'data', html);
-      }
+      // We no longer update the 'data' field *here*.  It's only for runtime.
     },
   });
 
@@ -212,10 +207,7 @@ export const CreateActionTemplate: React.FC = () => {
                         setNumSteps(Object.keys(newElementsByStep).length);
                         setCurrentStep(1);
 
-                        // Set initial content for editor
-                        if (templateData.elements[0]?.type === 'document' && templateData.elements[0]?.data) {
-                            editor?.commands.setContent(templateData.elements[0].data);
-                        }
+                        // We no longer set initial content for the editor *here*
                     }
                 } catch (error) {
                     console.error("Error loading template:", error);
@@ -225,7 +217,7 @@ export const CreateActionTemplate: React.FC = () => {
         };
 
         loadTemplate();
-    }, [selectedTemplate, editor]);
+    }, [selectedTemplate, editor]); // Keep editor in dependencies
 
 
   const handleAddElement = (type: TaskAction['type']) => {
@@ -234,10 +226,10 @@ export const CreateActionTemplate: React.FC = () => {
       const newElement: TaskAction = {
         id: Date.now().toString(),
         type,
-        title: '', // Title for all element types
+        title: '',
         completed: false,
-        description: '', // Description for all element types
-        data: type === 'document' ? '' : undefined, // Initialize 'data' for document type
+        description: '',
+        data: undefined, // data is now undefined at creation time
       };
       return {
         ...prev,
@@ -285,10 +277,11 @@ export const CreateActionTemplate: React.FC = () => {
             const allElements: TaskAction[] = [];
             for (let i = 1; i <= numSteps; i++) {
                 if (elementsByStep[i]) {
-                    const stepElements = elementsByStep[i].map(element => ({
-                        ...element,
-                        data: element.data !== undefined ? element.data : null,
-                    }));
+                    // Filter out the 'data' field if it's undefined
+                    const stepElements = elementsByStep[i].map(element => {
+                        const { data, ...rest } = element; // Destructure 'data'
+                        return data === undefined ? rest : element; // Conditionally include 'data'
+                    });
                     allElements.push(...stepElements);
                 }
             }
@@ -457,30 +450,22 @@ export const CreateActionTemplate: React.FC = () => {
                         {getActionIcon(element.type)}
                     </span>
 
-                    {element.type === 'document' ? (
-                        <div className="flex-1">
-                            <EditorToolbar editor={editor} />
-                            <div className="tiptap-editor-styles">
-                                <EditorContent editor={editor} />
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex-1 mr-2">
-                            <input
-                                type="text"
-                                value={element.title}
-                                onChange={(e) => handleElementChange(element.id, 'title', e.target.value)}
-                                placeholder={`Título da etapa ${index + 1}`}
-                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
-                            />
-                            <textarea
-                                value={element.description || ''}
-                                onChange={(e) => handleElementChange(element.id, 'description', e.target.value)}
-                                placeholder="Descrição da etapa (opcional)"
-                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 mt-2 text-gray-900"
-                            />
-                        </div>
-                    )}
+                    {/* NO EDITOR HERE */}
+                    <div className="flex-1 mr-2">
+                        <input
+                            type="text"
+                            value={element.title}
+                            onChange={(e) => handleElementChange(element.id, 'title', e.target.value)}
+                            placeholder={`Título da etapa ${index + 1}`}
+                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                        />
+                        <textarea
+                            value={element.description || ''}
+                            onChange={(e) => handleElementChange(element.id, 'description', e.target.value)}
+                            placeholder="Descrição da etapa (opcional)"
+                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 mt-2 text-gray-900"
+                        />
+                    </div>
 
                   <button
                     type="button"

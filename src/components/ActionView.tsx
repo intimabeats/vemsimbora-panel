@@ -92,7 +92,7 @@ const LineNumber = Extension.create({
 
 
 // --- Toolbar Component ---
-const EditorToolbar: React.FC<{ editor: Editor | null }> = ({ editor }) => {
+export const EditorToolbar: React.FC<{ editor: Editor | null }> = ({ editor }) => { // ADDED EXPORT HERE
   if (!editor) {
     return null;
   }
