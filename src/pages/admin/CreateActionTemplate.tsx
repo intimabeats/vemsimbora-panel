@@ -6,8 +6,8 @@ import { ActionTemplateSchema, TaskAction } from '../../types/firestore-schema'
 import { PlusCircle, Save, XCircle, Plus, Trash2, ChevronLeft, ChevronRight, File, FileText, Type, List, Settings, ArrowUp, ArrowDown, FileEdit } from 'lucide-react'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal';
 
-// TipTap Imports -  KEEP, but we won't use the editor *here*
-import { useEditor, EditorContent } from '@tiptap/react'
+// TipTap Imports - Keep, but don't use the editor *here*
+import { useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import LinkExtension from '@tiptap/extension-link';
 import ImageExtension from '@tiptap/extension-image';
@@ -16,7 +16,8 @@ import Underline from '@tiptap/extension-underline';
 import TextStyle from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import TextAlign from '@tiptap/extension-text-align'
-import { EditorToolbar } from '../../components/ActionView'; // Keep the import, but we won't use it directly here
+import { EditorToolbar } from '../../components/ActionView'; // Keep the import
+import { deepCopy } from '../../utils/helpers'; // Import deepCopy
 
 const getActionIcon = (type: TaskAction['type']) => {
   switch (type) {

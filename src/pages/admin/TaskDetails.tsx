@@ -231,8 +231,6 @@ export const TaskDetails: React.FC = () => {
   const totalActions = task.actions?.length ?? 0;
   const progress = totalActions > 0 ? (completedActions / totalActions) * 100 : 0;
 
-    const allActionsCompleted = totalActions > 0 && completedActions === totalActions;
-
     const formatDate = (timestamp: number) => {
         return new Date(timestamp).toLocaleDateString('pt-BR');
     };
@@ -322,24 +320,7 @@ export const TaskDetails: React.FC = () => {
                 <div key={action.id} className="border rounded-lg p-4 flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-gray-900">{action.title}</h4>
-                    <p className="text-sm text-gray-500">{action.description}</p>
-                    {action.data && (
-                      <p className="text-sm text-gray-500">
-                        Dados: {JSON.stringify(action.data)}
-                      </p>
-                    )}
-                    {action.completed && action.completedBy && users[action.completedBy] && (
-                        <div className="flex items-center mt-2">
-                            <img
-                                src={users[action.completedBy]?.profileImage || getDefaultProfileImage(users[action.completedBy]?.name || null)}
-                                alt={users[action.completedBy]?.name || 'Usuário Desconhecido'}
-                                className="w-6 h-6 rounded-full mr-2"
-                            />
-                            <span className="text-sm text-gray-600">
-                                Completo por: {users[action.completedBy]?.name || 'Usuário Desconhecido'}
-                            </span>
-                        </div>
-                    )}
+                    {/* No longer displaying individual action details here */}
                   </div>
                   <div>
                     {task.status !== 'waiting_approval' && task.status !== 'completed' && (
