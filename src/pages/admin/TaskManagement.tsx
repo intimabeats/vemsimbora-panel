@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Layout } from '../../components/Layout'
 import {
   Plus,
@@ -16,11 +16,12 @@ import {
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
 import { userManagementService } from '../../services/UserManagementService' // Corrected import
-import { TaskSchema } from '../../types/firestore-schema'
+import { TaskSchema, ProjectSchema } from '../../types/firestore-schema'
 import { CreateTaskModal } from '../../components/modals/CreateTaskModal'
 import { EditTaskModal } from '../../components/modals/EditTaskModal'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
 import { Link } from 'react-router-dom' // Import Link
+import useDebounce from '../../utils/useDebounce';
 
 export const TaskManagement: React.FC = () => {
   // Estados
@@ -40,9 +41,134 @@ export const TaskManagement: React.FC = () => {
   const [projectFilter, setProjectFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const debouncedSearchTerm = useDebounce(searchTerm, 500); // Debounce the search term
+
+  // Paginação
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const ITEMS_PER_PAGE = 9
+
+    // useCallback to prevent unnecessary re-renders of fetchProjects
+    // Pass filter as a parameter
+    const fetchProjects = useCallback(async (filter: { status?: ProjectSchema['status'] }) => {
+        try {
+            setLoading(true);
+            const options: {
+                status?: ProjectSchema['status'];
+                excludeStatus?: ProjectSchema['status'];
+                limit: number;
+                page: number;
+            } = {
+                limit: ITEMS_PER_PAGE,
+                page: currentPage,
+            };
+
+            if (filter.status) {
+                options.status = filter.status;
+            } else {
+                options.excludeStatus = 'archived'; // Exclude archived by default
+            }
+
+            const fetchedProjects = await projectService.fetchProjects(options);
+            setProjects(fetchedProjects.data);
+            setTotalPages(fetchedProjects.totalPages);
+
+        } catch (error) {
+            console.error('Erro ao buscar projetos:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [currentPage, ITEMS_PER_PAGE]); // Correct dependencies, removed filter
+
+  useEffect(() => {
+    fetchProjects(filter) // Pass filter here
+  }, [filter, currentPage, debouncedSearchTerm, fetchProjects]); // Use debouncedSearchTerm
+
+
+  const handleDeleteProject = async () => {
+    if (!selectedProject) return
+
+    try {
+      await projectService.deleteProject(selectedProject.id)
+      setProjects(prevProjects =>
+        prevProjects.filter(project => project.id !== selectedProject.id)
+      )
+      setSelectedProject(null)
+      setIsDeleteModalOpen(false)
+    } catch (error) {
+      console.error('Erro ao excluir projeto:', error)
+    }
+  }
+
+  const handleEditProject = (project: ProjectSchema) => {
+    setSelectedProject(project)
+    setIsEditModalOpen(true)
+  }
+
+  const handleDeleteConfirmation = (project: ProjectSchema) => {
+    setSelectedProject(project)
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleProjectCreated = (newProject: ProjectSchema) => {
+    setProjects(prevProjects => [newProject, ...prevProjects])
+  }
+
+  const handleProjectUpdated = (updatedProject: ProjectSchema) => {
+    setProjects(prevProjects =>
+      prevProjects.map(project =>
+        project.id === updatedProject.id ? updatedProject : project
+      )
+    )
+  }
+
+  const handleArchiveProject = async (projectId: string) => {
+    try {
+      await projectService.archiveProject(projectId);
+      // Refresh the project list
+      fetchProjects(filter); // Pass filter
+    } catch (error) {
+      console.error('Error archiving project:', error);
+    }
+  };
+
+  const handleUnarchiveProject = async (projectId: string) => {
+    try {
+      await projectService.unarchiveProject(projectId);
+      // Refresh the project list
+      fetchProjects(filter); // Pass filter
+    } catch (error) {
+      console.error('Error unarchiving project:', error);
+    }
+  };
+
+
+
+  const StatusBadge: React.FC<{ status: ProjectSchema['status'] }> = ({ status }) => {
+    const statusStyles = {
+      planning: 'bg-yellow-100 text-yellow-800',
+      active: 'bg-green-100 text-green-800',
+      completed: 'bg-blue-100 text-blue-800',
+      paused: 'bg-gray-100 text-gray-800',
+      cancelled: 'bg-red-100 text-red-800',
+      archived: 'bg-gray-400 text-white' // Style for archived status
+    }
+
+    const statusLabels = {
+      planning: 'Planejamento',
+      active: 'Ativo',
+      completed: 'Concluído',
+      paused: 'Pausado',
+      cancelled: 'Cancelado',
+      archived: 'Arquivado' // Label for archived status
+    }
+
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs ${statusStyles[status]}`}>
+        {statusLabels[status]}
+      </span>
+    )
+  }
 
   // Carregar dados
   useEffect(() => {
@@ -98,7 +224,7 @@ export const TaskManagement: React.FC = () => {
   )
 
   // Componente de Badge de Status
-  const StatusBadge: React.FC<{ status: TaskSchema['status'] }> = ({ status }) => {
+  const StatusBadgeTask: React.FC<{ status: TaskSchema['status'] }> = ({ status }) => {
     const statusStyles = {
       pending: 'bg-yellow-100 text-yellow-800',
       in_progress: 'bg-blue-100 text-blue-800',
@@ -284,12 +410,15 @@ export const TaskManagement: React.FC = () => {
                       <div className="flex items-center space-x-2">
                         <Users className="text-gray-500" size={16} />
                         <span className="text-gray-600 text-sm truncate max-w-[150px]">
-                          {task.assignedTo
-                            .map(userId => users[userId] || userId)
-                            .join(', ')}
+                          {/* Corrected: Check if task.assignedTo is an array before mapping */}
+                          {Array.isArray(task.assignedTo)
+                            ? task.assignedTo
+                                .map(userId => users[userId] || userId)
+                                .join(', ')
+                            : 'Nenhum responsável atribuído'} {/* Handle non-array case */}
                         </span>
                       </div>
-                      <StatusBadge status={task.status} />
+                      <StatusBadgeTask status={task.status} />
                     </div>
 
                     <div className="flex justify-between items-center">
@@ -369,3 +498,5 @@ export const TaskManagement: React.FC = () => {
     </Layout>
   )
 }
+
+export default TaskManagement

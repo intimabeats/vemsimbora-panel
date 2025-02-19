@@ -235,6 +235,8 @@ export const TaskDetails: React.FC = () => {
         return new Date(timestamp).toLocaleDateString('pt-BR');
     };
 
+  // Calculate allActionsCompleted
+  const allActionsCompleted = task.actions?.length > 0 && task.actions.every(action => action.completed);
 
 
   return (
