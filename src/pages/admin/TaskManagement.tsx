@@ -43,6 +43,10 @@ export const TaskManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearchTerm = useDebounce(searchTerm, 500); // Debounce the search term
 
+    const [filter, setFilter] = useState<{
+        status?: ProjectSchema['status']
+    }>({})
+
   // Paginação
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -50,9 +54,9 @@ export const TaskManagement: React.FC = () => {
 
     // useCallback to prevent unnecessary re-renders of fetchProjects
     // Pass filter as a parameter
-    const fetchProjects = useCallback(async (filter: { status?: ProjectSchema['status'] }) => {
+    const fetchProjects = useCallback(async (filter: { status?: ProjectSchema['status'] }, setIsLoading: React.Dispatch<React.SetStateAction<boolean>>) => { // Receive setIsLoading
         try {
-            setLoading(true);
+            setIsLoading(true); // Use the passed setIsLoading
             const options: {
                 status?: ProjectSchema['status'];
                 excludeStatus?: ProjectSchema['status'];
@@ -76,12 +80,12 @@ export const TaskManagement: React.FC = () => {
         } catch (error) {
             console.error('Erro ao buscar projetos:', error);
         } finally {
-            setLoading(false);
+            setIsLoading(false); // Use the passed setIsLoading
         }
-    }, [currentPage, ITEMS_PER_PAGE]); // Correct dependencies, removed filter
+    }, [currentPage, ITEMS_PER_PAGE]); // Correct dependencies: removed setLoading
 
   useEffect(() => {
-    fetchProjects(filter) // Pass filter here
+    fetchProjects(filter, setIsLoading) // Pass filter and setIsLoading here
   }, [filter, currentPage, debouncedSearchTerm, fetchProjects]); // Use debouncedSearchTerm
 
 
@@ -126,7 +130,7 @@ export const TaskManagement: React.FC = () => {
     try {
       await projectService.archiveProject(projectId);
       // Refresh the project list
-      fetchProjects(filter); // Pass filter
+      fetchProjects(filter, setIsLoading); // Pass filter and setIsLoading
     } catch (error) {
       console.error('Error archiving project:', error);
     }
@@ -136,7 +140,7 @@ export const TaskManagement: React.FC = () => {
     try {
       await projectService.unarchiveProject(projectId);
       // Refresh the project list
-      fetchProjects(filter); // Pass filter
+      fetchProjects(filter, setIsLoading); // Pass filter and setIsLoading
     } catch (error) {
       console.error('Error unarchiving project:', error);
     }
@@ -171,50 +175,50 @@ export const TaskManagement: React.FC = () => {
   }
 
   // Carregar dados
+    const loadData = useCallback(async () => { // Use useCallback here
+        try {
+            setIsLoading(true)
+            setError(null)
+
+            // Buscar projetos e usuários
+            const [projectsResponse, usersResponse, tasksResponse] = await Promise.all([
+                projectService.fetchProjects(),
+                userManagementService.fetchUsers(),
+                taskService.fetchTasks({
+                    projectId: projectFilter || undefined,
+                    status: statusFilter as TaskSchema['status'] || undefined,
+                    limit: ITEMS_PER_PAGE,
+                    page: currentPage
+                })
+            ])
+
+            // Mapear projetos
+            setProjects(projectsResponse.data.map(p => ({
+                id: p.id,
+                name: p.name
+            })))
+
+            // Mapear usuários
+            const userMap = usersResponse.data.reduce((acc, user) => {
+                acc[user.id] = user.name
+                return acc
+            }, {} as { [key: string]: string })
+            setUsers(userMap)
+
+            // Definir tarefas e total de páginas
+            setTasks(tasksResponse.data)
+            setTotalPages(tasksResponse.totalPages)
+        } catch (err: any) {
+            console.error('Erro ao carregar dados:', err)
+            setError(err.message || 'Falha ao carregar dados')
+        } finally {
+            setIsLoading(false)
+        }
+    }, [projectFilter, statusFilter, currentPage, ITEMS_PER_PAGE, setIsLoading, setError, setProjects, setUsers, setTasks, setTotalPages]); // Include setIsLoading and setError
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-
-        // Buscar projetos e usuários
-        const [projectsResponse, usersResponse, tasksResponse] = await Promise.all([
-          projectService.fetchProjects(),
-          userManagementService.fetchUsers(),
-          taskService.fetchTasks({
-            projectId: projectFilter || undefined,
-            status: statusFilter as TaskSchema['status'] || undefined,
-            limit: ITEMS_PER_PAGE,
-            page: currentPage
-          })
-        ])
-
-        // Mapear projetos
-        setProjects(projectsResponse.data.map(p => ({
-          id: p.id,
-          name: p.name
-        })))
-
-        // Mapear usuários
-        const userMap = usersResponse.data.reduce((acc, user) => {
-          acc[user.id] = user.name
-          return acc
-        }, {} as { [key: string]: string })
-        setUsers(userMap)
-
-        // Definir tarefas e total de páginas
-        setTasks(tasksResponse.data)
-        setTotalPages(tasksResponse.totalPages)
-      } catch (err: any) {
-        console.error('Erro ao carregar dados:', err)
-        setError(err.message || 'Falha ao carregar dados')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     loadData()
-  }, [projectFilter, statusFilter, currentPage])
+  }, [loadData]); // Simplified dependency
 
   // Filtrar tarefas
   const filteredTasks = tasks.filter(task =>
