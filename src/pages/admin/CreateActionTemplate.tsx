@@ -256,7 +256,7 @@ export const CreateActionTemplate: React.FC = () => {
           infoTitle: '',       // Initialize infoTitle
           infoDescription: '', // Initialize infoDescription
           hasAttachments: false, // Initialize hasAttachments
-          attachments: [],
+          data: { } // Initialize data, NO fileURLs here
         };
       } else {
         newElement = {
@@ -298,6 +298,7 @@ export const CreateActionTemplate: React.FC = () => {
     });
   };
 
+
   const handleNumStepsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value, 10);
     setNumSteps(isNaN(value) || value < 1 ? 1 : value);
@@ -316,10 +317,10 @@ export const CreateActionTemplate: React.FC = () => {
                     // Filter out data and other unnecessary fields, handling 'info' type
                     const stepElements = elementsByStep[i].map(element => {
                         if (element.type === 'info') {
-                            const {  completed, completedAt, completedBy, ...infoElement } = element;
+                            const {  completed, completedAt, completedBy, attachments, ...infoElement } = element;
                             return infoElement;
                         }
-                        const { data, ...rest } = element;
+                        const { data, ...rest } = element; // Keep data if it exists (for future use)
                         return data === undefined ? rest : element;
                     });
                     allElements.push(...stepElements);
@@ -330,6 +331,7 @@ export const CreateActionTemplate: React.FC = () => {
                 title,
                 type: 'custom',  // Assuming a 'custom' type for user-created templates
                 elements: allElements,
+                order: Date.now()
             };
 
             // Check if replacing or creating new
@@ -513,13 +515,13 @@ export const CreateActionTemplate: React.FC = () => {
                             type="text"
                             value={element.title}
                             onChange={(e) => handleElementChange(element.id, 'title', e.target.value)}
-                            placeholder={`Título da etapa ${index + 1}`}
+                            placeholder={`Título`}
                             className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
                         />
                         <textarea
                             value={element.description || ''}
                             onChange={(e) => handleElementChange(element.id, 'description', e.target.value)}
-                            placeholder="Descrição da etapa (opcional)"
+                            placeholder="Descrição"
                             className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300  text-gray-900"
                         />
                         {element.type === 'info' && (

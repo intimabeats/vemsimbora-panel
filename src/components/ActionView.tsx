@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TaskAction } from '../types/firestore-schema';
 import { taskService } from '../services/TaskService';
-import { X, Bold, Italic, List, Link, Image as ImageIcon, Code, ListOrdered, AlignLeft, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { X, Bold, Italic, List, Link, Image as ImageIcon, Code, ListOrdered, AlignLeft, ChevronLeft, ChevronRight, FileText, File, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getDefaultProfileImage } from "../utils/user";
 import { userManagementService } from '../services/UserManagementService';
@@ -295,13 +295,13 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
             setCurrentStep(currentStep + 1);
             editor?.commands.setContent(action.data.steps[currentStep + 1].data || '');
         } else {
-            // Prepare data for onComplete, including attachments if it's an 'info' type
+            // Prepare data for onComplete. For 'info' type, include uploadedFiles.
             let finalData: any = { ...stepData };
-            if (action.type === 'info' && action.hasAttachments) {
+            if (action.type === 'info') {
                 finalData = {
-                    ...finalData,
-                    attachments: uploadedFiles[currentStep] || [] // Include uploaded file URLs
-                };
+                  ...finalData,
+                  attachments: uploadedFiles[currentStep] || [] // Include uploaded file URLs
+                }
             }
             onComplete(action.id, finalData);
         }
@@ -403,38 +403,20 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                                     <p className="text-gray-600">{currentStepData.infoDescription}</p>
                                     {currentStepData.hasAttachments && (
                                         <>
-                                            <input
-                                                type="file"
-                                                multiple
-                                                onChange={handleFileUpload}
-                                                disabled={isUploading || action.completed}
-                                                className="mt-2"
-                                            />
+                                            {/* Removed file upload input */}
                                             {isUploading && <p>Uploading...</p>}
-                                            {/* Display uploaded files for this step */}
-                                            {uploadedFiles[currentStep] && uploadedFiles[currentStep].length > 0 && (
+
+                                            {/* Display file download links if available */}
+                                            {currentStepData.data?.fileURLs && currentStepData.data.fileURLs.length > 0 && (
                                                 <div className="mt-2">
-                                                    <h4 className="font-semibold">Arquivos Anexados:</h4>
-                                                    <ul>
-                                                        {uploadedFiles[currentStep].map((url, index) => (
-                                                            <li key={index}>
-                                                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                                    <h4 className="font-semibold">Arquivos para Download:</h4>
+                                                    <ul className="flex flex-wrap">
+                                                        {currentStepData.data.fileURLs.map((url, index) => (
+                                                            <li key={index} className="mr-4">
+                                                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center">
+                                                                    <File className='mr-1' size={16}/>
                                                                     Arquivo {index + 1}
-                                                                </a>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                            {/* Display previously uploaded attachments, if any */}
-                                            {action.attachments && action.attachments.length > 0 && (
-                                                <div className="mt-2">
-                                                    <h4 className="font-semibold">Arquivos Anexados Anteriormente:</h4>
-                                                    <ul>
-                                                        {action.attachments.map((attachment, index) => (
-                                                            <li key={index}>
-                                                                <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                                                    {attachment.name}
+                                                                    <Download className='ml-1' size={14} />
                                                                 </a>
                                                             </li>
                                                         ))}

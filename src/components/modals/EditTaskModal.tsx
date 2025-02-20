@@ -4,6 +4,8 @@ import {
   X,
   AlertTriangle,
     Info, // Import Info icon
+    File,
+    Download
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -170,6 +172,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 infoTitle: '',
                 infoDescription: '',
                 hasAttachments: false,
+                data: {} // Initialize data
             };
         }
 
@@ -440,6 +443,27 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                                 />
                                 Requer arquivos?
                             </label>
+                            {/* Display file download links if it's an 'info' type with attachments */}
+                            {action.type === 'info' && action.hasAttachments && action.data?.fileURLs && (
+                                <div className="mt-2">
+                                    <h4 className="font-semibold">{action.infoTitle}</h4> {/* Use infoTitle as header */}
+                                    <div className="flex flex-wrap">
+                                        {action.data.fileURLs.map((url, index) => (
+                                            <a
+                                                key={index}
+                                                href={url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center text-blue-600 hover:underline mr-4"
+                                            >
+                                                <File className="mr-1" size={16} />
+                                                Arquivo {index + 1}
+                                                <Download className="ml-1" size={14} />
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

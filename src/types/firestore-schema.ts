@@ -11,9 +11,9 @@ export interface UserSchema {
   createdAt: number
   updatedAt: number
   profileImage?: string
-  coverImage?: string; // Add coverImage
+  coverImage?: string;
   lastLogin?: number
-  bio?: string;       // NEW: Add bio field
+  bio?: string;
 }
 
 // Project Schema
@@ -23,7 +23,7 @@ export interface ProjectSchema {
   description: string
   startDate: number
   endDate?: number
-  status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived' // Added 'archived'
+  status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived'
   managers: string[]
   createdBy: string
   createdAt: number
@@ -38,7 +38,7 @@ export interface ProjectSchema {
       id: string
       name: string
       url: string
-      type: 'image' | 'video' | 'document' | 'link' | 'other'
+      type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio'
       size?: number
     }[]
   }[]
@@ -52,7 +52,7 @@ export interface TaskSchema {
   description: string;
   status: 'pending' | 'in_progress' | 'waiting_approval' | 'completed' | 'blocked';
   priority: 'low' | 'medium' | 'high' | 'critical';
-  assignedTo: string; // Changed from string[] to string
+  assignedTo: string[]; // Changed back to string[]
   createdBy: string; // User ID
   startDate?: number;
   dueDate: number;
@@ -91,6 +91,9 @@ export interface TaskAction {
     infoTitle?: string;         // Title for the info section
     infoDescription?: string;   // Description for the info section
     hasAttachments?: boolean;   // Flag for required attachments
+    data?: {
+        fileURLs?: string[];    // NEW: Array of file URLs for 'info' type
+    };
     attachments?: {             // Attachments specific to THIS action step
         id: string;
         name: string;
@@ -104,7 +107,9 @@ export interface TaskAction {
 export interface ActionTemplateSchema {
     id: string;
     title: string;
-    elements: TaskAction[]; // Now includes description
+    type: 'custom'; // Assuming a single type for now
+    elements: TaskAction[]; // Now includes description and fileURLs
+    order: number;
 }
 
     // Reward Schema

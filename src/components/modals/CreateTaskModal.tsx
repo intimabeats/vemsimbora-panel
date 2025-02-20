@@ -5,7 +5,9 @@ import {
   X,
   AlertTriangle,
   Plus,
-    Info // Import the Info icon
+    Info, // Import the Info icon
+    File, //NEW
+    Download, //NEW
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -49,6 +51,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [templates, setTemplates] = useState<{ id: string, title: string }[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [selectedProjectName, setSelectedProjectName] = useState('');
+    //NEW
+    const [attachments, setAttachments] = useState<{ [actionId: string]: File[] }>({});
 
 
     useEffect(() => {
@@ -67,6 +71,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             setFormErrors({});
             setSelectedTemplate('');
             setSelectedProjectName('');
+            setAttachments({}); // Reset attachments
         } else {
             setFormData(prev => ({ ...prev, projectId: projectId || '' }));
         }
@@ -115,22 +120,21 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'assignedTo'
-        ? Array.from((e.target as HTMLSelectElement).selectedOptions, option => option.value)
-        : value
-    }));
-
+    const { name, value } = e.target
+        setFormData(prev => ({
+            ...prev,
+            [name]: name === 'assignedTo'
+                ? Array.from((e.target as HTMLSelectElement).selectedOptions, option => option.value)
+                : value
+        }));
     if (formErrors[name]) {
       setFormErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
+        const newErrors = { ...prev }
+        delete newErrors[name]
+        return newErrors
+      })
     }
-  };
+  }
 
   const handleAddActionFromTemplate = async () => {
     if (!selectedTemplate) return;
@@ -174,6 +178,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 infoTitle: '',
                 infoDescription: '',
                 hasAttachments: false,
+                data: {} // Initialize data
             };
         }
 
@@ -190,6 +195,15 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             actions: prev.actions.map(action =>
                 action.id === actionId ? { ...action, [field]: value } : action
             ),
+        }));
+    };
+
+    // NEW: Handle file uploads
+    const handleFileUpload = (actionId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        setAttachments(prev => ({
+            ...prev,
+            [actionId]: files
         }));
     };
 
@@ -425,7 +439,33 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                         {action.type === 'info' && action.infoTitle && (
                             <span className="block text-sm text-gray-600">{action.infoTitle}</span>
                         )}
+
                     </div>
+                    {/* NEW: File upload for 'info' type with attachments */}
+                    {action.type === 'info' && action.hasAttachments && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                {action.infoTitle} {/* Use infoTitle as label */}
+                            </label>
+                            <input
+                                type="file"
+                                multiple
+                                onChange={(e) => handleFileUpload(action.id, e)}
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                            />
+                            {/* Display uploaded files for this specific action */}
+                            {attachments[action.id] && attachments[action.id].length > 0 && (
+                                <div className="mt-2">
+                                    <h4 className="font-semibold">Arquivos Carregados:</h4>
+                                    <ul>
+                                        {attachments[action.id].map((file, index) => (
+                                            <li key={index}>{file.name}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             ))}
             </div>
