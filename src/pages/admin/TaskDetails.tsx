@@ -1,11 +1,10 @@
-// src/pages/admin/TaskDetails.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Layout } from '../../components/Layout';
-import { taskService } from '../../services/TaskService';
-import { projectService } from '../../services/ProjectService';
-import { userManagementService } from '../../services/UserManagementService';
-import { TaskSchema, TaskAction } from '../../types/firestore-schema';
+import { Layout } from '../../components/Layout'
+import { taskService } from '../../services/TaskService'
+import { projectService } from '../../services/ProjectService'
+import { userManagementService } from '../../services/UserManagementService'
+import { TaskSchema, TaskAction } from '../../types/firestore-schema'
 import { ActionView } from '../../components/ActionView'; // Import ActionView
 import Confetti from 'react-confetti';
 import {
@@ -22,7 +21,8 @@ import {
   ArrowLeft,
   Loader2,
   MoreVertical,
-  CornerUpLeft
+  CornerUpLeft,
+    Info
 } from 'lucide-react';
 import { pulseKeyframes } from '../../utils/animation';
 import { getDefaultProfileImage } from '../../utils/user';
@@ -322,7 +322,14 @@ export const TaskDetails: React.FC = () => {
                 <div key={action.id} className="border rounded-lg p-4 flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-gray-900">{action.title}</h4>
-                    {/* No longer displaying individual action details here */}
+                        {/* Display 'info' type details */}
+                        {action.type === 'info' && (
+                            <>
+                                <h5 className="text-md font-semibold">{action.infoTitle}</h5>
+                                <p className="text-gray-600">{action.infoDescription}</p>
+                                {action.hasAttachments && <p className="text-sm text-gray-500">Arquivos Obrigatórios</p>}
+                            </>
+                        )}
                   </div>
                   <div>
                     {task.status !== 'waiting_approval' && task.status !== 'completed' && (

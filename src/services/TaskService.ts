@@ -162,7 +162,7 @@ export class TaskService {
               projectName: projectData.name,
               taskId: taskId,
               taskName: updatedTaskData.title,
-              details: `Task updated.`, // You can add more details here
+              details: `Task updated.`, // You can add more details here if needed
           });
       }
 
@@ -185,58 +185,58 @@ export class TaskService {
   }
 
   // Buscar tarefas com paginação e filtros
-  async fetchTasks(options?: {
-    projectId?: string
-    status?: TaskSchema['status']
-    assignedTo?: string
-    limit?: number
-    page?: number
-  }) {
-    try {
-      let q = query(collection(this.db, 'tasks'))
+async fetchTasks(options?: {
+  projectId?: string
+  status?: TaskSchema['status']
+  assignedTo?: string
+  limit?: number
+  page?: number
+}) {
+  try {
+    let q = query(collection(this.db, 'tasks'))
 
-      // Filtros
-      if (options?.projectId) {
-        q = query(q, where('projectId', '==', options.projectId))
-      }
-
-      if (options?.status) {
-        q = query(q, where('status', '==', options.status))
-      }
-
-      if (options?.assignedTo) {
-        q = query(q, where('assignedTo', 'array-contains', options.assignedTo))
-      }
-
-      // Ordenação
-      q = query(q, orderBy('createdAt', 'desc'))
-
-      // Executar consulta
-      const snapshot = await getDocs(q)
-      const allTasks = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as TaskSchema))
-
-      // Paginação
-      const limit = options?.limit || 10
-      const page = options?.page || 1
-      const startIndex = (page - 1) * limit
-      const endIndex = startIndex + limit
-
-      const paginatedTasks = allTasks.slice(startIndex, endIndex)
-      const totalPages = Math.ceil(allTasks.length / limit)
-
-      return {
-        data: paginatedTasks,
-        totalPages,
-        totalTasks: allTasks.length
-      }
-    } catch (error) {
-      console.error('Erro ao buscar tarefas:', error)
-      throw error
+    // Filtros
+    if (options?.projectId) {
+      q = query(q, where('projectId', '==', options.projectId))
     }
+
+    if (options?.status) {
+      q = query(q, where('status', '==', options.status))
+    }
+
+    if (options?.assignedTo) {
+      q = query(q, where('assignedTo', 'array-contains', options.assignedTo))
+    }
+
+    // Ordenação
+    q = query(q, orderBy('createdAt', 'desc'))
+
+    // Executar consulta
+    const snapshot = await getDocs(q)
+    const allTasks = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as TaskSchema))
+
+    // Paginação
+    const limit = options?.limit || 10
+    const page = options?.page || 1
+    const startIndex = (page - 1) * limit
+    const endIndex = startIndex + limit
+
+    const paginatedTasks = allTasks.slice(startIndex, endIndex)
+    const totalPages = Math.ceil(allTasks.length / limit)
+
+    return {
+      data: paginatedTasks,
+      totalPages,
+      totalTasks: allTasks.length
+    }
+  } catch (error) {
+    console.error('Erro ao buscar tarefas:', error)
+    throw error
   }
+}
 
   // Buscar tarefa por ID
   async getTaskById(taskId: string): Promise<TaskSchema> {
@@ -334,30 +334,48 @@ export class TaskService {
     }
   }
 
-  // NEW: Complete a task action
-  async completeTaskAction(taskId: string, actionId: string, data?: any): Promise<void> {
-    try {
-      const taskRef = doc(this.db, 'tasks', taskId);
-      const taskSnap = await getDoc(taskRef);
+    // NEW: Complete a task action
+    async completeTaskAction(taskId: string, actionId: string, data?: any): Promise<void> {
+        try {
+            const taskRef = doc(this.db, 'tasks', taskId);
+            const taskSnap = await getDoc(taskRef);
 
-      if (!taskSnap.exists()) {
-        throw new Error('Task not found');
-      }
+            if (!taskSnap.exists()) {
+                throw new Error('Task not found');
+            }
 
-      const taskData = taskSnap.data() as TaskSchema;
-      const updatedActions = taskData.actions.map(action =>
-        action.id === actionId ? { ...action, completed: true, completedAt: Date.now(), completedBy: auth.currentUser?.uid, data } : action // Add completedBy
-      );
+            const taskData = taskSnap.data() as TaskSchema;
+            const updatedActions = taskData.actions.map(action => {
+                if (action.id === actionId) {
+                    let updatedAction: TaskAction = {
+                        ...action,
+                        completed: true,
+                        completedAt: Date.now(),
+                        completedBy: auth.currentUser?.uid
+                    };
 
-      await updateDoc(taskRef, {
-        actions: updatedActions,
-        updatedAt: Date.now()
-      });
-    } catch (error) {
-      console.error('Error completing task action:', error);
-      throw error;
+                    // If it's an 'info' action with attachments, handle them
+                    if (action.type === 'info' && action.hasAttachments && data && data.attachments) {
+                        updatedAction = {
+                            ...updatedAction,
+                            attachments: data.attachments // Store attachment URLs
+                        };
+                    }
+                    return updatedAction;
+
+                }
+                return action;
+            });
+
+            await updateDoc(taskRef, {
+                actions: updatedActions,
+                updatedAt: Date.now()
+            });
+        } catch (error) {
+            console.error('Error completing task action:', error);
+            throw error;
+        }
     }
-  }
 
   // NEW: Uncomplete a task action
       async uncompleteTaskAction(taskId: string, actionId: string): Promise<void> {
@@ -371,7 +389,7 @@ export class TaskService {
 
             const taskData = taskSnap.data() as TaskSchema;
             const updatedActions = taskData.actions.map(action =>
-                action.id === actionId ? { ...action, completed: false, completedAt: null, completedBy: null, data: null } : action
+                action.id === actionId ? { ...action, completed: false, completedAt: null, completedBy: null, attachments: action.type === 'info' && action.hasAttachments ? [] : action.attachments } : action // Clear attachments if 'info'
             );
 
             await updateDoc(taskRef, {

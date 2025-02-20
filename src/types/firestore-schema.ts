@@ -1,3 +1,5 @@
+// src/types/firestore-schema.ts
+
 // User Schema
 export interface UserSchema {
   id: string
@@ -14,36 +16,36 @@ export interface UserSchema {
   bio?: string;       // NEW: Add bio field
 }
 
-    // Project Schema
-    export interface ProjectSchema {
+// Project Schema
+export interface ProjectSchema {
+  id: string
+  name: string
+  description: string
+  startDate: number
+  endDate?: number
+  status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived' // Added 'archived'
+  managers: string[]
+  createdBy: string
+  createdAt: number
+  updatedAt: number
+  messages?: {
+    id: string
+    userId: string
+    userName: string
+    content: string
+    timestamp: number
+    attachments?: {
       id: string
       name: string
-      description: string
-      startDate: number
-      endDate?: number
-      status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived' // Added 'archived'
-      managers: string[]
-      createdBy: string
-      createdAt: number
-      updatedAt: number
-      messages?: {
-        id: string
-        userId: string
-        userName: string
-        content: string
-        timestamp: number
-        attachments?: {
-          id: string
-          name: string
-          url: string
-          type: 'image' | 'video' | 'document' | 'link' | 'other'
-          size?: number
-        }[]
-      }[]
-    }
+      url: string
+      type: 'image' | 'video' | 'document' | 'link' | 'other'
+      size?: number
+    }[]
+  }[]
+}
 
-    // Task Schema
-    export interface TaskSchema {
+// Task Schema
+export interface TaskSchema {
   id: string;
   projectId: string;
   title: string;
@@ -80,12 +82,22 @@ export interface UserSchema {
 export interface TaskAction {
   id: string;
   title: string;
-  type: 'text' | 'long_text' | 'file_upload' | 'approval' | 'date' | 'document'; // Add 'document'
+  type: 'text' | 'long_text' | 'file_upload' | 'approval' | 'date' | 'document' | 'info'; // Added 'info'
   completed: boolean;
   completedAt?: number | null;
   completedBy?: string | null;
-  data?: any; // TipTap will store HTML here
   description?: string;
+    // Specific fields for 'info' type
+    infoTitle?: string;         // Title for the info section
+    infoDescription?: string;   // Description for the info section
+    hasAttachments?: boolean;   // Flag for required attachments
+    attachments?: {             // Attachments specific to THIS action step
+        id: string;
+        name: string;
+        url: string;
+        type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio';
+        size?: number;
+    }[];
 }
 
 //NEW: Interface for a task action template

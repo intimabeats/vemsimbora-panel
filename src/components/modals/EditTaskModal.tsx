@@ -1,9 +1,9 @@
-// src/components/modals/EditTaskModal.tsx
 import React, { useState, useEffect } from 'react'
 import {
   CheckCircle,
   X,
   AlertTriangle,
+    Info, // Import Info icon
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -154,6 +154,41 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     }
   };
 
+    // NEW: Add an action manually
+    const handleAddAction = (type: TaskAction['type']) => {
+        let newAction: Partial<TaskAction> = {
+            id: Date.now().toString() + Math.random().toString(36).substring(7), // Unique ID
+            type: type,
+            title: '', // Default title
+            completed: false,
+        };
+
+        // If it's an 'info' type, add the specific fields
+        if (type === 'info') {
+            newAction = {
+                ...newAction,
+                infoTitle: '',
+                infoDescription: '',
+                hasAttachments: false,
+            };
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            actions: [...prev.actions, newAction as TaskAction],
+        }));
+    };
+
+    // NEW: Handle changes within an action
+    const handleActionChange = (actionId: string, field: keyof TaskAction, value: any) => {
+        setFormData(prev => ({
+            ...prev,
+            actions: prev.actions.map(action =>
+                action.id === actionId ? { ...action, [field]: value } : action
+            ),
+        }));
+    };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateForm()) return
@@ -186,7 +221,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
         <div className="flex justify-between items-center p-6 border-b">
           <h2 className="text-xl font-bold flex items-center">
             <CheckCircle className="mr-2 text-blue-600" />
-            Edit Task
+            Editar Tarefa
           </h2>
           <button
             onClick={onClose}
@@ -348,6 +383,23 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
             </div>
           </div>
 
+            {/* NEW: Add Action Buttons */}
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Adicionar Ação Manualmente
+                </label>
+                <div className="flex space-x-2">
+                    <button
+                        type="button"
+                        onClick={() => handleAddAction('info')}
+                        className="px-3 py-1 rounded-full text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    >
+                        <Info size={16} className="mr-1" /> Informações Importantes
+                    </button>
+                    {/* Add other action type buttons here as needed */}
+                </div>
+            </div>
+
           {/* Display Added Actions */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -358,7 +410,38 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 <div key={action.id} className="border rounded-lg p-4 flex items-center justify-between">
                     <div>
                         <span className="font-medium text-gray-900">{action.title}</span>
+                        {/* NEW: Display infoTitle if it's an 'info' type */}
+                        {action.type === 'info' && action.infoTitle && (
+                            <span className="block text-sm text-gray-600">{action.infoTitle}</span>
+                        )}
                     </div>
+                     {/* NEW: Add input fields for 'info' type */}
+                    {action.type === 'info' && (
+                        <div className="space-y-2">
+                            <input
+                                type="text"
+                                value={action.infoTitle || ''}
+                                onChange={(e) => handleActionChange(action.id, 'infoTitle', e.target.value)}
+                                placeholder="Título das Informações"
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                            />
+                            <textarea
+                                value={action.infoDescription || ''}
+                                onChange={(e) => handleActionChange(action.id, 'infoDescription', e.target.value)}
+                                placeholder="Descrição das Informações"
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                            />
+                            <label className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={action.hasAttachments || false}
+                                    onChange={(e) => handleActionChange(action.id, 'hasAttachments', e.target.checked)}
+                                    className="mr-2"
+                                />
+                                Requer arquivos?
+                            </label>
+                        </div>
+                    )}
                 </div>
             ))}
             </div>

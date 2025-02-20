@@ -1,9 +1,8 @@
-// src/pages/admin/CreateActionTemplate.tsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout } from '../../components/Layout'
 import { actionTemplateService } from '../../services/ActionTemplateService'
 import { ActionTemplateSchema, TaskAction } from '../../types/firestore-schema'
-import { PlusCircle, Save, XCircle, Plus, Trash2, ChevronLeft, ChevronRight, File, FileText, Type, List, Settings, ArrowUp, ArrowDown, FileEdit } from 'lucide-react'
+import { PlusCircle, Save, XCircle, Plus, Trash2, ChevronLeft, ChevronRight, File, FileText, Type, List, Settings, ArrowUp, ArrowDown, FileEdit, Info } from 'lucide-react' // Added Info icon
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal';
 
 // TipTap Imports - Keep, but don't use the editor *here*
@@ -31,6 +30,8 @@ const getActionIcon = (type: TaskAction['type']) => {
       return <List size={16} />;
     case 'document':
       return <FileEdit size={16} />;
+    case 'info': // Added case for 'info'
+      return <Info size={16} />;
     default:
       return null;
   }
@@ -45,6 +46,7 @@ interface ManageTemplatesModalProps {
   onReorder: (templates: ActionTemplateSchema[]) => void;
 }
 
+// ... (ManageTemplatesModal remains unchanged) ...
 const ManageTemplatesModal: React.FC<ManageTemplatesModalProps> = ({ isOpen, onClose, templates, onDelete, onReorder }) => {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
@@ -149,6 +151,9 @@ export const CreateActionTemplate: React.FC = () => {
   const [templates, setTemplates] = useState<ActionTemplateSchema[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+    const [saveOption, setSaveOption] = useState<'replace' | 'new' | null>(null); // 'replace', 'new', or null
+    const [existingTemplateId, setExistingTemplateId] = useState<string | null>(null); // To store the ID for replacement
+
 
   // TipTap Editor (Keep the instance, but don't use it directly in the render)
   const editor = useEditor({
@@ -188,50 +193,80 @@ export const CreateActionTemplate: React.FC = () => {
     }, [fetchTemplates]);
 
     useEffect(() => {
-        const loadTemplate = async () => {
-            if (selectedTemplate) {
-                try {
-                    const templateData = await actionTemplateService.getActionTemplateById(selectedTemplate);
-                    if (templateData) {
-                        setTitle(templateData.title);
+    const loadTemplate = async () => {
+        if (selectedTemplate) {
+            try {
+                const templateData = await actionTemplateService.getActionTemplateById(selectedTemplate);
+                if (templateData) {
+                    setTitle(templateData.title);
+                    setExistingTemplateId(templateData.id); // Store the existing ID
 
-                        const newElementsByStep: { [step: number]: TaskAction[] } = {};
-                        let stepCounter = 1;
-                        for (const element of templateData.elements) {
-                            if (!newElementsByStep[stepCounter]) {
-                                newElementsByStep[stepCounter] = [];
-                            }
-                            newElementsByStep[stepCounter].push(element);
+                    const newElementsByStep: { [step: number]: TaskAction[] } = {};
+                    let currentStep = 1;
+                    let currentStepElements: TaskAction[] = [];
+
+                    // Iterate through the elements and group them by step
+                    for (const element of templateData.elements) {
+                        currentStepElements.push(element);
+                        if (element.type === 'document' || element.type === 'approval') { // Assuming 'document' marks end of step
+                            newElementsByStep[currentStep] = currentStepElements;
+                            currentStep++;
+                            currentStepElements = []; // Reset for the next step
                         }
-
-                        setElementsByStep(newElementsByStep);
-                        setNumSteps(Object.keys(newElementsByStep).length);
-                        setCurrentStep(1);
-
-                        // We no longer set initial content for the editor *here*
                     }
-                } catch (error) {
-                    console.error("Error loading template:", error);
-                    setError("Failed to load the selected template.");
-                }
-            }
-        };
+                    // Add any remaining elements to the last step
+                    if (currentStepElements.length > 0) {
+                        newElementsByStep[currentStep] = currentStepElements;
+                    }
 
-        loadTemplate();
-    }, [selectedTemplate, editor]); // Keep editor in dependencies
+                    setElementsByStep(newElementsByStep);
+                    setNumSteps(Object.keys(newElementsByStep).length);
+                    setCurrentStep(1);
+                }
+            } catch (error) {
+                console.error("Error loading template:", error);
+                setError("Failed to load the selected template.");
+            }
+        } else {
+            // Reset if no template is selected
+            setTitle('');
+            setElementsByStep({});
+            setNumSteps(1);
+            setCurrentStep(1);
+            setExistingTemplateId(null);
+        }
+    };
+
+    loadTemplate();
+}, [selectedTemplate, editor]); // Keep editor in dependencies
 
 
   const handleAddElement = (type: TaskAction['type']) => {
     setElementsByStep(prev => {
       const currentElements = prev[currentStep] || [];
-      const newElement: TaskAction = {
-        id: Date.now().toString(),
-        type,
-        title: '',
-        completed: false,
-        description: '',
-        data: undefined, // data is now undefined at creation time
-      };
+      let newElement: TaskAction;
+
+      if (type === 'info') {
+        newElement = {
+          id: Date.now().toString(),
+          type,
+          title: '', // Initialize infoTitle
+          completed: false,
+          description: '',
+          infoTitle: '',       // Initialize infoTitle
+          infoDescription: '', // Initialize infoDescription
+          hasAttachments: false, // Initialize hasAttachments
+          attachments: [],
+        };
+      } else {
+        newElement = {
+          id: Date.now().toString(),
+          type,
+          title: '',
+          completed: false,
+          description: '',
+        };
+      }
       return {
         ...prev,
         [currentStep]: [...currentElements, newElement]
@@ -278,10 +313,14 @@ export const CreateActionTemplate: React.FC = () => {
             const allElements: TaskAction[] = [];
             for (let i = 1; i <= numSteps; i++) {
                 if (elementsByStep[i]) {
-                    // Filter out the 'data' field if it's undefined
+                    // Filter out data and other unnecessary fields, handling 'info' type
                     const stepElements = elementsByStep[i].map(element => {
-                        const { data, ...rest } = element; // Destructure 'data'
-                        return data === undefined ? rest : element; // Conditionally include 'data'
+                        if (element.type === 'info') {
+                            const {  completed, completedAt, completedBy, ...infoElement } = element;
+                            return infoElement;
+                        }
+                        const { data, ...rest } = element;
+                        return data === undefined ? rest : element;
                     });
                     allElements.push(...stepElements);
                 }
@@ -289,23 +328,40 @@ export const CreateActionTemplate: React.FC = () => {
 
             const newTemplate: Omit<ActionTemplateSchema, 'id'> = {
                 title,
-                type: 'custom',
+                type: 'custom',  // Assuming a 'custom' type for user-created templates
                 elements: allElements,
             };
 
-            await actionTemplateService.createActionTemplate(newTemplate);
-            setSuccess(true);
-            setTitle('');
-            setElementsByStep({});
-            setNumSteps(1);
-            setCurrentStep(1);
-            setSelectedTemplate('');
-            await fetchTemplates();
+            // Check if replacing or creating new
+            if (saveOption === 'replace' && existingTemplateId) {
+                await actionTemplateService.updateActionTemplate(existingTemplateId, newTemplate);
+                setSuccess(true);
+            } else {
+                // Check for title uniqueness if creating new
+                const existingTemplates = await actionTemplateService.fetchActionTemplates();
+                if (existingTemplates.some(t => t.title === title)) {
+                    setError("Já existe um modelo com este título. Por favor, escolha um título diferente.");
+                    setIsLoading(false);
+                    return; // Stop the process
+                }
+
+                await actionTemplateService.createActionTemplate(newTemplate);
+                setSuccess(true);
+                // Reset form only on successful *creation*
+                setTitle('');
+                setElementsByStep({});
+                setNumSteps(1);
+                setCurrentStep(1);
+                setSelectedTemplate('');
+            }
+
+            await fetchTemplates(); // Refresh templates list in all cases
 
         } catch (err: any) {
             setError(err.message || 'Falha ao criar modelo de ação');
         } finally {
             setIsLoading(false);
+            setSaveOption(null); // Reset save option
         }
     };
 
@@ -397,14 +453,14 @@ export const CreateActionTemplate: React.FC = () => {
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <strong className="font-bold">Erro:</strong>
+            <strong className="font-bold">Erro: </strong>
             <span className="block sm:inline"> {error}</span>
           </div>
         )}
 
         {success && (
           <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <strong className="font-bold">Sucesso!</strong>
+            <strong className="font-bold">Sucesso! </strong>
             <span className="block sm:inline"> Modelo de ação criado.</span>
           </div>
         )}
@@ -452,7 +508,7 @@ export const CreateActionTemplate: React.FC = () => {
                     </span>
 
                     {/* NO EDITOR HERE */}
-                    <div className="flex-1 mr-2">
+                    <div className="flex-1 mr-2 space-y-2">
                         <input
                             type="text"
                             value={element.title}
@@ -464,8 +520,34 @@ export const CreateActionTemplate: React.FC = () => {
                             value={element.description || ''}
                             onChange={(e) => handleElementChange(element.id, 'description', e.target.value)}
                             placeholder="Descrição da etapa (opcional)"
-                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 mt-2 text-gray-900"
+                            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300  text-gray-900"
                         />
+                        {element.type === 'info' && (
+                            <>
+                                <input
+                                    type="text"
+                                    value={element.infoTitle || ''}
+                                    onChange={(e) => handleElementChange(element.id, 'infoTitle', e.target.value)}
+                                    placeholder="Título das Informações Importantes"
+                                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                                />
+                                <textarea
+                                    value={element.infoDescription || ''}
+                                    onChange={(e) => handleElementChange(element.id, 'infoDescription', e.target.value)}
+                                    placeholder="Descrição das Informações Importantes"
+                                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                                />
+                                <label className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={element.hasAttachments || false}
+                                        onChange={(e) => handleElementChange(element.id, 'hasAttachments', e.target.checked)}
+                                        className="mr-2"
+                                    />
+                                    Requer arquivos?
+                                </label>
+                            </>
+                        )}
                     </div>
 
                   <button
@@ -521,6 +603,14 @@ export const CreateActionTemplate: React.FC = () => {
               >
                 <Plus className="mr-1" size={16} /> Documento
               </button>
+                <button
+                    type="button"
+                    onClick={() => handleAddElement('info')}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    title="Adicionar Informações Importantes"
+                >
+                    <Plus className="mr-1" size={16} /> Informações
+                </button>
             </div>
           </div>
 
@@ -545,15 +635,39 @@ export const CreateActionTemplate: React.FC = () => {
         </div>
 
         <div className="mt-4">
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            disabled={isLoading || !isFormValid()}
-            className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
-          >
-            {isLoading ? 'Salvando...' : 'Salvar Modelo'}
-            <Save className="ml-2" />
-          </button>
+            {/* Conditional rendering based on whether a template is selected */}
+            {existingTemplateId ? (
+                <>
+                    <button
+                        type="button"
+                        onClick={() => setSaveOption('replace')}
+                        disabled={isLoading || !isFormValid()}
+                        className={`w-full px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:opacity-50 flex items-center justify-center mb-2`}
+                    >
+                        {isLoading ? 'Salvando...' : 'Substituir Modelo Existente'}
+                        <Save className="ml-2" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSaveOption('new')}
+                        disabled={isLoading || !isFormValid()}
+                        className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
+                    >
+                        {isLoading ? 'Salvando...' : 'Salvar como Novo Modelo'}
+                        <Save className="ml-2" />
+                    </button>
+                </>
+            ) : (
+                <button
+                    type="submit"
+                    onClick={handleSubmit}
+                    disabled={isLoading || !isFormValid()}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center"
+                >
+                    {isLoading ? 'Salvando...' : 'Salvar Modelo'}
+                    <Save className="ml-2" />
+                </button>
+            )}
         </div>
       </div>
 
@@ -564,6 +678,33 @@ export const CreateActionTemplate: React.FC = () => {
         onDelete={handleDeleteTemplate}
         onReorder={handleReorderTemplates}
       />
+        {/* Confirmation Modal for Save Option */}
+        {saveOption && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-lg">
+                    <p className="mb-4">
+                        {saveOption === 'replace'
+                            ? 'Tem certeza que deseja substituir o modelo existente?'
+                            : 'Criar um novo modelo com este título irá sobrescrever qualquer modelo existente com o mesmo nome. Deseja continuar?'
+                        }
+                    </p>
+                    <div className="flex justify-end space-x-4">
+                        <button
+                            onClick={() => setSaveOption(null)}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            className={`px-4 py-2 text-white rounded ${saveOption === 'replace' ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        >
+                            {saveOption === 'replace' ? 'Substituir' : 'Criar Novo'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     </Layout>
   )
 }

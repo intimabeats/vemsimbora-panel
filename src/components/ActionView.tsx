@@ -1,8 +1,7 @@
-// src/components/ActionView.tsx
 import React, { useState, useEffect } from 'react';
 import { TaskAction } from '../types/firestore-schema';
 import { taskService } from '../services/TaskService';
-import { X, Bold, Italic, List, Link, Image as ImageIcon, Code, ListOrdered, AlignLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Bold, Italic, List, Link, Image as ImageIcon, Code, ListOrdered, AlignLeft, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getDefaultProfileImage } from "../utils/user";
 import { userManagementService } from '../services/UserManagementService';
@@ -207,6 +206,8 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<{ name: string; photoURL?: string } | null>(null);
   const { currentUser } = useAuth();
+    const [uploadedFiles, setUploadedFiles] = useState<{ [key: number]: string[] }>({}); // Store uploaded file URLs
+
 
   // Lazily initialize the editor to avoid server-side rendering issues.
   const editor = useEditor({
@@ -266,33 +267,43 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
     }));
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
 
-    setIsUploading(true);
-    setError(null);
-    try {
-      const fileUrl = await taskService.uploadTaskAttachment(taskId, file);
-      setStepData(prevStepData => ({
-        ...prevStepData,
-        [currentStep]: { fileUrl }, // Store as object for consistency
-      }));
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload file.');
-    } finally {
-      setIsUploading(false);
-    }
-  };
+        setIsUploading(true);
+        setError(null);
+        try {
+            const uploadPromises = files.map(file => taskService.uploadTaskAttachment(taskId, file));
+            const fileUrls = await Promise.all(uploadPromises);
+
+            setUploadedFiles(prev => ({
+                ...prev,
+                [currentStep]: [...(prev[currentStep] || []), ...fileUrls] // Append new URLs
+            }));
+
+            // No longer storing in stepData directly.  Attachments are in the 'attachments' field.
+        } catch (err: any) {
+            setError(err.message || 'Failed to upload file.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     const handleCompleteStep = () => {
         if (currentStep < (action.data?.steps?.length ?? 0) - 1) {
             setCurrentStep(currentStep + 1);
-            // Load content for the next step into the editor
             editor?.commands.setContent(action.data.steps[currentStep + 1].data || '');
         } else {
-            // If it's the last step, call onComplete with all accumulated data
-            onComplete(action.id, stepData);
+            // Prepare data for onComplete, including attachments if it's an 'info' type
+            let finalData: any = { ...stepData };
+            if (action.type === 'info' && action.hasAttachments) {
+                finalData = {
+                    ...finalData,
+                    attachments: uploadedFiles[currentStep] || [] // Include uploaded file URLs
+                };
+            }
+            onComplete(action.id, finalData);
         }
     };
 
@@ -317,7 +328,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl mx-4">
                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-semibold">{action.title} - Step {currentStep + 1} of {action.data?.steps?.length || 1}</h2>
+                    <h2 className="text-xl font-semibold">{action.title} - Etapa {currentStep + 1} de {action.data?.steps?.length || 1}</h2>
                     <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">
                         <X size={24} />
                     </button>
@@ -335,7 +346,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                             {currentStepData.type === 'text' && (
                                 <input
                                     type="text"
-                                    placeholder="Enter text..."
+                                    placeholder="Digite o texto..."
                                     value={stepData[currentStep] || ''}
                                     onChange={handleTextChange}
                                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
@@ -343,7 +354,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                             )}
                             {currentStepData.type === 'long_text' && (
                                 <textarea
-                                    placeholder="Enter long text..."
+                                    placeholder="Digite o texto longo..."
                                     value={stepData[currentStep] || ''}
                                     onChange={handleTextChange}
                                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 h-32 text-gray-900"
@@ -358,7 +369,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                                     />
                                     {stepData[currentStep]?.fileUrl && (
                                         <a href={stepData[currentStep].fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                                            View File
+                                            Ver Arquivo
                                         </a>
                                     )}
                                     {isUploading && <span>Uploading...</span>}
@@ -366,7 +377,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                             )}
                             {currentStepData.type === 'approval' && (
                                 <div>
-                                    <p>Waiting for approval...</p>
+                                    <p>Aguardando aprovação...</p>
                                 </div>
                             )}
                             {currentStepData.type === 'date' && (
@@ -385,9 +396,58 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                                     </div>
                                 </>
                             )}
+
+                            {currentStepData.type === 'info' && (
+                                <div>
+                                    <h3 className="text-lg font-semibold">{currentStepData.infoTitle}</h3>
+                                    <p className="text-gray-600">{currentStepData.infoDescription}</p>
+                                    {currentStepData.hasAttachments && (
+                                        <>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                onChange={handleFileUpload}
+                                                disabled={isUploading || action.completed}
+                                                className="mt-2"
+                                            />
+                                            {isUploading && <p>Uploading...</p>}
+                                            {/* Display uploaded files for this step */}
+                                            {uploadedFiles[currentStep] && uploadedFiles[currentStep].length > 0 && (
+                                                <div className="mt-2">
+                                                    <h4 className="font-semibold">Arquivos Anexados:</h4>
+                                                    <ul>
+                                                        {uploadedFiles[currentStep].map((url, index) => (
+                                                            <li key={index}>
+                                                                <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                                                    Arquivo {index + 1}
+                                                                </a>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {/* Display previously uploaded attachments, if any */}
+                                            {action.attachments && action.attachments.length > 0 && (
+                                                <div className="mt-2">
+                                                    <h4 className="font-semibold">Arquivos Anexados Anteriormente:</h4>
+                                                    <ul>
+                                                        {action.attachments.map((attachment, index) => (
+                                                            <li key={index}>
+                                                                <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                                                    {attachment.name}
+                                                                </a>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </>
                     ) : (
-                        <p>No data for this step.</p> // Handle case where currentStepData is null
+                        <p>Nenhum dado para esta etapa.</p> // Handle case where currentStepData is null
                     )}
                 </div>
 
@@ -399,7 +459,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                             className="w-8 h-8 rounded-full mr-2"
                         />
                         <span className="text-sm text-gray-600">
-                            Completed by {user.name}
+                            Completado por {user.name}
                         </span>
                     </div>
                 )}
@@ -416,7 +476,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                             onClick={handlePreviousStep}
                             className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                         >
-                            <ChevronLeft size={16} /> Previous
+                            <ChevronLeft size={16} /> Anterior
                         </button>
                     )}
                     <button
@@ -424,7 +484,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                         disabled={isUploading}
                         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                     >
-                        {isUploading ? 'Uploading...' : (currentStep === (action.data?.steps?.length ?? 1) -1 ? 'Complete Action' : 'Next')}
+                        {isUploading ? 'Uploading...' : (currentStep === (action.data?.steps?.length ?? 1) -1 ? 'Completar Ação' : 'Próximo')}
                         {currentStep < (action.data?.steps?.length ?? 1) - 1 && <ChevronRight size={16} />}
                     </button>
 
