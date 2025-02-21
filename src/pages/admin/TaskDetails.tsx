@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'

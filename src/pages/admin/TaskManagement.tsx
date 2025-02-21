@@ -8,19 +8,15 @@ import {
   Clock,
   Users,
   Search,
-  Filter,
   ChevronLeft,
-  ChevronRight,
-  MoreVertical
+  ChevronRight
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
-import { userManagementService } from '../../services/UserManagementService' // Corrected import
+import { userManagementService } from '../../services/UserManagementService'
 import { TaskSchema, ProjectSchema } from '../../types/firestore-schema'
-import { CreateTaskModal } from '../../components/modals/CreateTaskModal'
-import { EditTaskModal } from '../../components/modals/EditTaskModal'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
-import { Link } from 'react-router-dom' // Import Link
+import { Link, useNavigate } from 'react-router-dom' // Import Link and useNavigate
 import useDebounce from '../../utils/useDebounce';
 
 export const TaskManagement: React.FC = () => {
@@ -33,8 +29,6 @@ export const TaskManagement: React.FC = () => {
 
   // Estados de modal
   const [selectedTask, setSelectedTask] = useState<TaskSchema | null>(null)
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
 
   // Estados de filtro e paginação
@@ -51,6 +45,11 @@ export const TaskManagement: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const ITEMS_PER_PAGE = 9
+
+  // NEW: State for selected project for new task
+  const [selectedNewTaskProject, setSelectedNewTaskProject] = useState('');
+  const navigate = useNavigate();
+
 
     // useCallback to prevent unnecessary re-renders of fetchProjects
     // Pass filter as a parameter
@@ -104,10 +103,9 @@ export const TaskManagement: React.FC = () => {
     }
   }
 
-  const handleEditProject = (project: ProjectSchema) => {
-    setSelectedProject(project)
-    setIsEditModalOpen(true)
-  }
+  //const handleEditProject = (project: ProjectSchema) => { // REMOVED, NOT USED HERE
+  //  setSelectedProject(project)
+  //}
 
   const handleDeleteConfirmation = (project: ProjectSchema) => {
     setSelectedProject(project)
@@ -252,21 +250,6 @@ export const TaskManagement: React.FC = () => {
     )
   }
 
-  // Manipuladores de ações
-  const handleCreateTask = (newTask: TaskSchema) => {
-    setTasks(prev => [newTask, ...prev])
-    setIsCreateModalOpen(false)
-  }
-
-  const handleUpdateTask = (updatedTask: TaskSchema) => {
-    setTasks(prev =>
-      prev.map(task =>
-        task.id === updatedTask.id ? updatedTask : task
-      )
-    )
-    setIsEditModalOpen(false)
-    setSelectedTask(null)
-  }
 
   const handleDeleteTask = async () => {
     if (!selectedTask) return
@@ -281,6 +264,13 @@ export const TaskManagement: React.FC = () => {
     }
   }
 
+    // NEW: Handle new task creation - navigate to the correct route
+    const handleNewTask = () => {
+        if (selectedNewTaskProject) {
+            navigate(`/admin/projects/${selectedNewTaskProject}/create-task`);
+        }
+    };
+
   return (
     <Layout role="admin" isLoading={isLoading}>
       <div className="container mx-auto p-6">
@@ -294,19 +284,27 @@ export const TaskManagement: React.FC = () => {
               Gerencie e acompanhe todas as tarefas do sistema
             </p>
           </div>
-          <div className="flex space-x-4"> {/* Container for buttons */}
+          <div className="flex space-x-4">
+            {/* NEW: Project selection for new task */}
+            <select
+              value={selectedNewTaskProject}
+              onChange={(e) => setSelectedNewTaskProject(e.target.value)}
+              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Selecione um Projeto</option>
+              {projects.map(project => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
             <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
+              onClick={handleNewTask}
+              disabled={!selectedNewTaskProject} // Disable if no project is selected
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md disabled:opacity-50"
             >
               <Plus className="mr-2" /> Nova Tarefa
             </button>
-            <Link
-              to="/admin/action-templates/create"
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition shadow-md"
-            >
-              <Plus className="mr-2" /> Criar Modelo de Ação
-            </Link>
           </div>
         </div>
 
@@ -382,18 +380,16 @@ export const TaskManagement: React.FC = () => {
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
                       <h2 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition">
-                        <Link to={`/tasks/${task.id}`}>{task.title}</Link> {/* Link to TaskDetails */}
+                        <Link to={`/tasks/${task.id}`}>{task.title}</Link> {/* Correct Link */}
                       </h2>
                       <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => {
-                            setSelectedTask(task)
-                            setIsEditModalOpen(true)
-                          }}
-                          className="text-blue-500 hover:text-blue-700"
-                        >
-                          <Edit size={20} />
-                        </button>
+                        <Link to={`/admin/projects/${task.projectId}/edit-task/${task.id}`}>
+                            <button
+                            className="text-blue-500 hover:text-blue-700"
+                            >
+                            <Edit size={20} />
+                            </button>
+                        </Link>
                         <button
                           onClick={() => {
                             setSelectedTask(task)
@@ -468,7 +464,7 @@ export const TaskManagement: React.FC = () => {
         )}
 
         {/* Modais */}
-        <CreateTaskModal
+        {/*<CreateTaskModal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
           onTaskCreated={handleCreateTask}
@@ -484,7 +480,7 @@ export const TaskManagement: React.FC = () => {
                 setSelectedTask(null)
               }}
               onTaskUpdated={handleUpdateTask}
-            />
+            />*/}
 
             <DeleteConfirmationModal
               isOpen={isDeleteModalOpen}
@@ -493,11 +489,11 @@ export const TaskManagement: React.FC = () => {
                 setSelectedTask(null)
               }}
               onConfirm={handleDeleteTask}
-              itemName={selectedTask.title}
+              itemName={selectedTask ? selectedTask.title : ''}
               warningMessage="A exclusão de uma tarefa removerá permanentemente todas as suas informações do sistema."
             />
-          </>
-        )}
+          {/*</>
+        )}*/}
       </div>
     </Layout>
   )

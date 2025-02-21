@@ -17,7 +17,7 @@ import { ForgotPassword } from './pages/auth/ForgotPassword'
 import { Profile } from './pages/Profile'
 import { Unauthorized } from './pages/Unauthorized'
 import { Notifications } from './pages/Notifications'
-import { TaskDetails } from './pages/admin/TaskDetails'
+import { TaskDetails } from './pages/admin/TaskDetails' // Keep this for the read-only view
 import { CreateActionTemplate } from './pages/admin/CreateActionTemplate'
 import { ActionTemplateManagement } from './pages/admin/ActionTemplateManagement'
 import { UserProfile } from './pages/UserProfile'; // Import UserProfile
@@ -31,8 +31,8 @@ import { ProjectDetails } from './pages/admin/ProjectDetails'
 import { ProjectChat } from './pages/admin/ProjectChat'
 import { TaskManagement } from './pages/admin/TaskManagement'
 import { SystemSettings } from './pages/admin/SystemSettings'
-import { CreateProjectTask } from './pages/admin/CreateProjectTask'
-import { EditProjectTask } from './pages/admin/EditProjectTask' // Import the new page
+import { CreateProjectTask } from './pages/admin/CreateProjectTask' // RESTORED
+import { EditProjectTask } from './pages/admin/EditProjectTask' // RESTORED
 
 // Manager Imports
 import { ManagerDashboard } from './pages/manager/Dashboard'
@@ -80,9 +80,9 @@ const App: React.FC = () => {
               }
             />
 
-            {/* Task Details Route - Specific Task ID */}
+            {/* Task Details Route - Specific Task ID (Read-Only) */}
             <Route
-              path="/tasks/:taskId"
+              path="/tasks/:taskId"  // Correct path for TaskDetails (read-only)
               element={
                 <PrivateRoute>
                   <TaskDetails />
@@ -131,7 +131,7 @@ const App: React.FC = () => {
                 </PrivateRoute>
               }
             />
-            {/* NEW: Route for creating tasks within a project */}
+            {/* RESTORED: Route for creating tasks within a project */}
             <Route
               path="/admin/projects/:projectId/create-task"
               element={
@@ -141,7 +141,7 @@ const App: React.FC = () => {
               }
             />
 
-            {/* NEW: Route for editing tasks within a project */}
+            {/* RESTORED: Route for editing tasks within a project */}
             <Route
               path="/admin/projects/:projectId/edit-task/:taskId"
               element={
@@ -150,7 +150,7 @@ const App: React.FC = () => {
                 </PrivateRoute>
               }
             />
-            {/* Corrected Route: /admin/tasks should show TaskManagement */}
+            {/*  Route: /admin/tasks should show TaskManagement */}
             <Route
               path="/admin/tasks"
               element={
@@ -167,7 +167,7 @@ const App: React.FC = () => {
                 </PrivateRoute>
               }
             />
-            {/* NEW: Action Template Routes */}
+            {/*  Action Template Routes */}
             <Route
               path="/admin/action-templates/create"
               element={

@@ -5,7 +5,10 @@ import { Layout } from '../../components/Layout'
 import {
   CheckCircle,
   AlertTriangle,
-    ArrowLeft
+    Info, // Import Info icon
+    File,
+    Download,
+    ArrowLeft // ADDED THIS IMPORT
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -14,10 +17,12 @@ import { TaskSchema, TaskAction } from '../../types/firestore-schema'
 import { systemSettingsService } from '../../services/SystemSettingsService'
 import { actionTemplateService } from '../../services/ActionTemplateService';
 import { deepCopy } from '../../utils/helpers';
+import { useAuth } from '../../context/AuthContext'
 
 export const EditProjectTask: React.FC = () => {
     const { projectId, taskId } = useParams<{ projectId: string; taskId: string }>() // Get both IDs
     const navigate = useNavigate()
+    const {currentUser} = useAuth();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -36,40 +41,53 @@ export const EditProjectTask: React.FC = () => {
 
     const [users, setUsers] = useState<{ id: string, name: string }[]>([])
     const [coinsReward, setCoinsReward] = useState(0)
-    const [templates, setTemplates] = useState<{ id: string, title: string }[]>([]);
+    const [templates, setTemplates] = useState<{ id: string, title: string }[]>([]); // State for templates
     const [selectedTemplate, setSelectedTemplate] = useState('');
     const [projectName, setProjectName] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
 
     useEffect(() => {
+        if (projectId) {
+            projectService.getProjectById(projectId)
+                .then(project => setProjectName(project.name))
+                .catch(err => {
+                    console.error("Error fetching project name:", err);
+                    setError("Failed to fetch project name.");
+                });
+        }
+    }, [projectId]);
+
+    // Load initial data (projects, users, settings, templates)
+    useEffect(() => {
         const loadData = async () => {
             try {
                 setIsLoading(true);
                 setError(null);
-                const [usersRes, settings, templatesRes, taskData, projectData] = await Promise.all([
+                const [usersRes, settings, templatesRes, taskData] = await Promise.all([
                     userManagementService.fetchUsers(),
                     systemSettingsService.getSettings(),
-                    actionTemplateService.fetchActionTemplates(),
-                    taskService.getTaskById(taskId!),
-                    projectService.getProjectById(projectId!)
-                ]);
+                    actionTemplateService.fetchActionTemplates(), // Fetch templates
+                    taskService.getTaskById(taskId!)
+                ])
 
                 setUsers(usersRes.data.map(u => ({ id: u.id, name: u.name })))
                 setCoinsReward(Math.round(settings.taskCompletionBase * formData.difficultyLevel * settings.complexityMultiplier))
-                setTemplates(templatesRes.map(t => ({ id: t.id, title: t.title })));
-                setProjectName(projectData.name);
+                setTemplates(templatesRes.map(t => ({ id: t.id, title: t.title }))); // Set templates
 
-                setFormData({
-                    title: taskData.title,
-                    description: taskData.description,
-                    projectId: taskData.projectId,
-                    assignedTo: taskData.assignedTo,
-                    priority: taskData.priority,
-                    dueDate: new Date(taskData.dueDate).toISOString().split('T')[0],
-                    difficultyLevel: taskData.difficultyLevel || 5,
-                    actions: taskData.actions || []
-                });
+                // Set initial form data from fetched task
+                if (taskData) {
+                    setFormData({
+                        title: taskData.title,
+                        description: taskData.description,
+                        projectId: taskData.projectId,
+                        assignedTo: taskData.assignedTo,
+                        priority: taskData.priority,
+                        dueDate: new Date(taskData.dueDate).toISOString().split('T')[0],
+                        difficultyLevel: taskData.difficultyLevel || 5,
+                        actions: taskData.actions || []
+                    });
+                }
 
             } catch (err: any) {
                 setError(err.message || 'Falha ao carregar dados');
@@ -81,20 +99,24 @@ export const EditProjectTask: React.FC = () => {
         if (taskId) {
             loadData();
         }
-    }, [taskId, projectId, formData.difficultyLevel]);
+    }, [taskId, formData.difficultyLevel, projectId])
 
 
+    // Form validation (Step 1)
     const validateForm = () => {
         const errors: { [key: string]: string } = {}
-        if (!formData.title.trim()) errors.title = 'Título é obrigatório'
-        if (!formData.description.trim()) errors.description = 'Descrição é obrigatória'
-        if (formData.assignedTo.length === 0) errors.assignedTo = 'Pelo menos um responsável é obrigatório'
-        if (!formData.dueDate) errors.dueDate = 'Data de vencimento é obrigatória'
+        if (!formData.title.trim()) errors.title = 'Title is required'
+        if (!formData.description.trim()) errors.description = 'Description is required'
+        if (!formData.projectId) errors.projectId = 'Project is required'
+        if (formData.assignedTo.length === 0) errors.assignedTo = 'At least one assignee is required'
+        if (!formData.dueDate) errors.dueDate = "Due date is required";
 
         setFormErrors(errors)
         return Object.keys(errors).length === 0
     }
 
+
+    // Event handlers
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target
         setFormData(prev => ({
@@ -113,31 +135,67 @@ export const EditProjectTask: React.FC = () => {
         }
     }
 
-  const handleAddActionFromTemplate = async () => {
-    if (!selectedTemplate) return;
+    const handleAddActionFromTemplate = async () => {
+        if (!selectedTemplate) return;
 
-    try {
-      const fullTemplate = await actionTemplateService.getActionTemplateById(selectedTemplate);
-      if (!fullTemplate) return;
+        try {
+            const fullTemplate = await actionTemplateService.getActionTemplateById(selectedTemplate);
+            if (!fullTemplate) return;
 
-      const newAction: TaskAction = {
-        id: Date.now().toString() + Math.random().toString(36).substring(7),
-        title: fullTemplate.title, // Use template title
-        type: 'document', //  We use a single type.
-        completed: false,
-        description: fullTemplate.elements.map(e => e.description).join(' '), // combine descriptions.
-        data: { steps: deepCopy(fullTemplate.elements) }, // Store the steps in 'data'
-      };
+            const newAction: TaskAction = {
+                id: Date.now().toString() + Math.random().toString(36).substring(7),
+                title: fullTemplate.title, // Use template title
+                type: 'document', //  We use a single type.
+                completed: false,
+                description: fullTemplate.elements.map(e => e.description).join(' '), // combine descriptions.
+                data: { steps: deepCopy(fullTemplate.elements) }, // Store the steps in 'data'
+            };
 
-      setFormData(prev => ({
-        ...prev,
-        actions: [...prev.actions, newAction],
-      }));
-    } catch (error) {
-      console.error("Error adding action from template:", error);
-      setError("Failed to add action from template.");
-    }
-  };
+            setFormData(prev => ({
+                ...prev,
+                actions: [...prev.actions, newAction],
+            }));
+        } catch (error) {
+            console.error("Error adding action from template:", error);
+            setError("Failed to add action from template.");
+        }
+    };
+
+    // NEW: Add an action manually
+    const handleAddAction = (type: TaskAction['type']) => {
+        let newAction: Partial<TaskAction> = {
+            id: Date.now().toString() + Math.random().toString(36).substring(7), // Unique ID
+            type: type,
+            title: '', // Default title
+            completed: false,
+        };
+
+        // If it's an 'info' type, add the specific fields
+        if (type === 'info') {
+            newAction = {
+                ...newAction,
+                infoTitle: '',
+                infoDescription: '',
+                hasAttachments: false,
+                data: {} // Initialize data
+            };
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            actions: [...prev.actions, newAction as TaskAction],
+        }));
+    };
+
+    // NEW: Handle changes within an action
+    const handleActionChange = (actionId: string, field: keyof TaskAction, value: any) => {
+        setFormData(prev => ({
+            ...prev,
+            actions: prev.actions.map(action =>
+                action.id === actionId ? { ...action, [field]: value } : action
+            ),
+        }));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -147,24 +205,29 @@ export const EditProjectTask: React.FC = () => {
         setError(null)
 
         try {
-            await taskService.updateTask(taskId!, {
+            if (!taskId) {
+                setError('Task ID is missing.');
+                return
+            }
+            const updateData = {
                 ...formData,
                 dueDate: new Date(formData.dueDate).getTime(),
-                coinsReward // Recalculate or keep existing
-            });
+                coinsReward
+            }
 
-            navigate(`/admin/projects/${projectId}`);
+            await taskService.updateTask(taskId, updateData)
+            navigate(`/admin/projects/${projectId}`); // Navigate back
 
         } catch (err: any) {
-            setError(err.message || 'Falha ao atualizar tarefa')
+            setError(err.message || 'Failed to update task')
         } finally {
             setLoading(false)
         }
     }
 
 
-  return (
-    <Layout role="admin" isLoading={isLoading}>
+    return (
+    <Layout role={currentUser?.role || 'employee'}>
       <div className="container mx-auto p-6">
           <div className="flex justify-between items-center mb-6">
             <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-blue-600">
@@ -183,11 +246,10 @@ export const EditProjectTask: React.FC = () => {
               {error}
             </div>
           )}
-
           <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-md space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Título
+                  Title
                 </label>
                 <input
                   type="text"
@@ -204,7 +266,7 @@ export const EditProjectTask: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Descrição
+                  Description
                 </label>
                 <textarea
                   name="description"
@@ -217,7 +279,6 @@ export const EditProjectTask: React.FC = () => {
                   <p className="text-red-500 text-xs mt-1">{formErrors.description}</p>
                 )}
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Responsáveis
@@ -281,7 +342,7 @@ export const EditProjectTask: React.FC = () => {
               {/* Action Templates */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Adicionar Ação de um Modelo
+                  Add Action from Template
                 </label>
                 <div className="flex space-x-2">
                   <select
@@ -289,7 +350,7 @@ export const EditProjectTask: React.FC = () => {
                     onChange={(e) => setSelectedTemplate(e.target.value)}
                     className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Selecione um Modelo</option>
+                    <option value="">Select Template</option>
                     {templates.map(template => (
                       <option key={template.id} value={template.id}>
                         {template.title}
@@ -302,22 +363,70 @@ export const EditProjectTask: React.FC = () => {
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                     disabled={!selectedTemplate}
                   >
-                    Adicionar
+                    Add
                   </button>
                 </div>
               </div>
 
+              {/* NEW: Add Action Buttons */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Adicionar Ação Manualmente
+                </label>
+                <div className="flex space-x-2">
+                    <button
+                        type="button"
+                        onClick={() => handleAddAction('info')}
+                        className="px-3 py-1 rounded-full text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    >
+                        <Info size={16} className="mr-1" /> Informações Importantes
+                    </button>
+                    {/* Add other action type buttons here as needed */}
+                </div>
+            </div>
+
               {/* Display Added Actions */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ações
+                  Actions
                 </label>
                 <div className="space-y-2">
                 {formData.actions.map((action) => (
                     <div key={action.id} className="border rounded-lg p-4 flex items-center justify-between">
                         <div>
                             <span className="font-medium text-gray-900">{action.title}</span>
+                            {/* NEW: Display infoTitle if it's an 'info' type */}
+                            {action.type === 'info' && action.infoTitle && (
+                                <span className="block text-sm text-gray-600">{action.infoTitle}</span>
+                            )}
                         </div>
+                         {/* NEW: Add input fields for 'info' type */}
+                        {action.type === 'info' && (
+                            <div className="space-y-2">
+                                <input
+                                    type="text"
+                                    value={action.infoTitle || ''}
+                                    onChange={(e) => handleActionChange(action.id, 'infoTitle', e.target.value)}
+                                    placeholder="Título das Informações"
+                                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                                />
+                                <textarea
+                                    value={action.infoDescription || ''}
+                                    onChange={(e) => handleActionChange(action.id, 'infoDescription', e.target.value)}
+                                    placeholder="Descrição das Informações"
+                                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                                />
+                                <label className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={action.hasAttachments || false}
+                                        onChange={(e) => handleActionChange(action.id, 'hasAttachments', e.target.checked)}
+                                        className="mr-2"
+                                    />
+                                    Requer arquivos?
+                                </label>
+                            </div>
+                        )}
                     </div>
                 ))}
                 </div>
@@ -328,10 +437,10 @@ export const EditProjectTask: React.FC = () => {
                   className={`w-full py-2 rounded-lg text-white transition ${loading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
                     }`}
                 >
-                  {loading ? 'Atualizando...' : 'Atualizar Tarefa'}
+                  {loading ? 'Updating...' : 'Update Task'}
                 </button>
-        </form>
-      </div>
-    </Layout>
-  )
+            </form>
+          </div>
+        </Layout>
+    )
 }

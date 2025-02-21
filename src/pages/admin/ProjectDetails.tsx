@@ -71,7 +71,8 @@ const FileItem: React.FC<{
   )
 }
 
-export const ProjectDetails: React.FC = () => {
+export const ProjectDetails: React.FC = () =>
+{
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { currentUser } = useAuth()
@@ -282,7 +283,7 @@ export const ProjectDetails: React.FC = () => {
       completed: 'bg-blue-100 text-blue-800',
       paused: 'bg-gray-100 text-gray-800',
       cancelled: 'bg-red-100 text-red-800',
-      archived: 'bg-gray-400 text-white'
+      archived: 'bg-gray-400 text-white' // Style for archived status
     }
 
     const statusLabels = {
@@ -291,7 +292,7 @@ export const ProjectDetails: React.FC = () => {
       completed: 'Concluído',
       paused: 'Pausado',
       cancelled: 'Cancelado',
-      archived: 'Arquivado'
+      archived: 'Arquivado' // Label for archived status
     }
 
     return (
@@ -393,9 +394,9 @@ export const ProjectDetails: React.FC = () => {
             {/* Create Task Button - Link to the new page */}
             <Link
               to={`/admin/projects/${projectId}/create-task`}
-              className="bg-blue-600 text-white px-3 py-1 rounded-full hover:bg-blue-700 transition flex items-center"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition"
             >
-              <Plus size={20} />
+              <Plus className="mr-2" /> Criar Tarefa
             </Link>
           </div>
 
@@ -410,7 +411,7 @@ export const ProjectDetails: React.FC = () => {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-medium text-gray-900">
-                      <Link to={`/tasks/${task.id}`} className="hover:underline">
+                      <Link to={`/admin/projects/${projectId}/edit-task/${task.id}`} className="hover:underline">
                         {task.title}
                       </Link>
                     </h3>
