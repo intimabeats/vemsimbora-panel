@@ -1,11 +1,10 @@
+// src/components/modals/EditTaskModal.tsx
 import React, { useState, useEffect } from 'react'
 import {
   CheckCircle,
   X,
   AlertTriangle,
-    Info, // Import Info icon
-    File,
-    Download
+    Trash2
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -35,6 +34,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     projectId: task.projectId,
     assignedTo: task.assignedTo,
     priority: task.priority,
+    startDate: new Date(task.startDate || Date.now()).toISOString().split('T')[0], // Added start date
     dueDate: new Date(task.dueDate).toISOString().split('T')[0],
     difficultyLevel: task.difficultyLevel || 5,
     actions: task.actions || []  // Initialize actions
@@ -62,6 +62,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
         projectId: task.projectId,
         assignedTo: task.assignedTo,
         priority: task.priority,
+        startDate: new Date(task.startDate || Date.now()).toISOString().split('T')[0], // Initialize start date
         dueDate: new Date(task.dueDate).toISOString().split('T')[0],
         difficultyLevel: task.difficultyLevel || 5,
         actions: task.actions || [] // Ensure actions is initialized
@@ -103,7 +104,8 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     if (!formData.title.trim()) errors.title = 'Title is required'
     if (!formData.description.trim()) errors.description = 'Description is required'
     if (!formData.projectId) errors.projectId = 'Project is required'
-    if (formData.assignedTo.length === 0) errors.assignedTo = 'At least one assignee is required'
+    if (!formData.assignedTo) errors.assignedTo = 'At least one assignee is required' // Validate single assignee
+    if (!formData.startDate) errors.startDate = 'Start date is required'; // Validate start date
     if (!formData.dueDate) errors.dueDate = "Due date is required";
 
     setFormErrors(errors)
@@ -116,9 +118,7 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'assignedTo'
-        ? Array.from((e.target as HTMLSelectElement).selectedOptions, option => option.value)
-        : value
+      [name]: value
     }))
 
     if (formErrors[name]) {
@@ -156,39 +156,10 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     }
   };
 
-    // NEW: Add an action manually
-    const handleAddAction = (type: TaskAction['type']) => {
-        let newAction: Partial<TaskAction> = {
-            id: Date.now().toString() + Math.random().toString(36).substring(7), // Unique ID
-            type: type,
-            title: '', // Default title
-            completed: false,
-        };
-
-        // If it's an 'info' type, add the specific fields
-        if (type === 'info') {
-            newAction = {
-                ...newAction,
-                infoTitle: '',
-                infoDescription: '',
-                hasAttachments: false,
-                data: {} // Initialize data
-            };
-        }
-
+    const handleRemoveAction = (actionId: string) => {
         setFormData(prev => ({
             ...prev,
-            actions: [...prev.actions, newAction as TaskAction],
-        }));
-    };
-
-    // NEW: Handle changes within an action
-    const handleActionChange = (actionId: string, field: keyof TaskAction, value: any) => {
-        setFormData(prev => ({
-            ...prev,
-            actions: prev.actions.map(action =>
-                action.id === actionId ? { ...action, [field]: value } : action
-            ),
+            actions: prev.actions.filter(action => action.id !== actionId)
         }));
     };
 
@@ -200,8 +171,13 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
     setError(null)
 
     try {
+      if (!task.id) {
+        setError('Task ID is missing.');
+        return
+      }
       const updateData = {
         ...formData,
+        startDate: new Date(formData.startDate).getTime(), // Convert start date
         dueDate: new Date(formData.dueDate).getTime(),
         coinsReward
       }
@@ -299,16 +275,16 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Assignees
+              Assignee
             </label>
             <select
-              multiple
               name="assignedTo"
               value={formData.assignedTo}
               onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.assignedTo ? 'border-red-500' : 'focus:ring-blue-500'
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.assignedTo ? 'border-red-500' : 'focus:ring-blue-500'
                 }`}
             >
+              <option value="">Selecione um responsável</option> {/* Added a default option */}
               {users.map(user => (
                 <option key={user.id} value={user.id}>
                   {user.name}
@@ -321,10 +297,10 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Difficulty Level (1-10)
+              Difficulty Level (2-9)
             </label>
             <div className="flex space-x-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(level => (
+              {[2, 3, 4, 5, 6, 7, 8, 9].map(level => (
                 <button
                   key={level}
                   type="button"
@@ -340,21 +316,40 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Due Date
-            </label>
-            <input
-              type="date"
-              name="dueDate"
-              value={formData.dueDate}
-              onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dueDate ? 'border-red-500' : 'focus:ring-blue-500'
-                }`}
-            />
-            {formErrors.dueDate && (
-              <p className="text-red-500 text-xs mt-1">{formErrors.dueDate}</p>
-            )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Início
+              </label>
+              <input
+                type="date"
+                name="startDate"
+                value={formData.startDate}
+                onChange={handleChange}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.startDate ? 'border-red-500' : 'focus:ring-blue-500'
+                  }`}
+              />
+              {formErrors.startDate && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Vencimento
+              </label>
+              <input
+                type="date"
+                name="dueDate"
+                value={formData.dueDate}
+                onChange={handleChange}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dueDate ? 'border-red-500' : 'focus:ring-blue-500'
+                  }`}
+              />
+              {formErrors.dueDate && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.dueDate}</p>
+              )}
+            </div>
           </div>
 
           {/* Action Templates */}
@@ -386,23 +381,6 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
             </div>
           </div>
 
-            {/* NEW: Add Action Buttons */}
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Adicionar Ação Manualmente
-                </label>
-                <div className="flex space-x-2">
-                    <button
-                        type="button"
-                        onClick={() => handleAddAction('info')}
-                        className="px-3 py-1 rounded-full text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    >
-                        <Info size={16} className="mr-1" /> Informações Importantes
-                    </button>
-                    {/* Add other action type buttons here as needed */}
-                </div>
-            </div>
-
           {/* Display Added Actions */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -413,59 +391,18 @@ export const EditTaskModal: React.FC<EditTaskModalProps> = ({
                 <div key={action.id} className="border rounded-lg p-4 flex items-center justify-between">
                     <div>
                         <span className="font-medium text-gray-900">{action.title}</span>
-                        {/* NEW: Display infoTitle if it's an 'info' type */}
                         {action.type === 'info' && action.infoTitle && (
                             <span className="block text-sm text-gray-600">{action.infoTitle}</span>
                         )}
                     </div>
-                     {/* NEW: Add input fields for 'info' type */}
-                    {action.type === 'info' && (
-                        <div className="space-y-2">
-                            <input
-                                type="text"
-                                value={action.infoTitle || ''}
-                                onChange={(e) => handleActionChange(action.id, 'infoTitle', e.target.value)}
-                                placeholder="Título das Informações"
-                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
-                            />
-                            <textarea
-                                value={action.infoDescription || ''}
-                                onChange={(e) => handleActionChange(action.id, 'infoDescription', e.target.value)}
-                                placeholder="Descrição das Informações"
-                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
-                            />
-                            <label className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    checked={action.hasAttachments || false}
-                                    onChange={(e) => handleActionChange(action.id, 'hasAttachments', e.target.checked)}
-                                    className="mr-2"
-                                />
-                                Requer arquivos?
-                            </label>
-                            {/* Display file download links if it's an 'info' type with attachments */}
-                            {action.type === 'info' && action.hasAttachments && action.data?.fileURLs && (
-                                <div className="mt-2">
-                                    <h4 className="font-semibold">{action.infoTitle}</h4> {/* Use infoTitle as header */}
-                                    <div className="flex flex-wrap">
-                                        {action.data.fileURLs.map((url, index) => (
-                                            <a
-                                                key={index}
-                                                href={url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center text-blue-600 hover:underline mr-4"
-                                            >
-                                                <File className="mr-1" size={16} />
-                                                Arquivo {index + 1}
-                                                <Download className="ml-1" size={14} />
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <button
+                        type="button"
+                        onClick={() => handleRemoveAction(action.id)}
+                        className="text-red-500 hover:text-red-700"
+                        title="Remover ação"
+                    >
+                        <Trash2 size={16} />
+                    </button>
                 </div>
             ))}
             </div>

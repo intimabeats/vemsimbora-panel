@@ -1,3 +1,4 @@
+// src/pages/admin/TaskManagement.tsx
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout } from '../../components/Layout'
 import {
@@ -14,7 +15,7 @@ import {
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
 import { userManagementService } from '../../services/UserManagementService'
-import { TaskSchema, ProjectSchema } from '../../types/firestore-schema'
+import { TaskSchema } from '../../types/firestore-schema'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
 import { Link, useNavigate } from 'react-router-dom' // Import Link and useNavigate
 import useDebounce from '../../utils/useDebounce';
@@ -38,7 +39,7 @@ export const TaskManagement: React.FC = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 500); // Debounce the search term
 
     const [filter, setFilter] = useState<{
-        status?: ProjectSchema['status']
+        status?: TaskSchema['status']
     }>({})
 
   // Paginação
@@ -52,125 +53,21 @@ export const TaskManagement: React.FC = () => {
 
 
     // useCallback to prevent unnecessary re-renders of fetchProjects
-    // Pass filter as a parameter
-    const fetchProjects = useCallback(async (filter: { status?: ProjectSchema['status'] }, setIsLoading: React.Dispatch<React.SetStateAction<boolean>>) => { // Receive setIsLoading
+    const fetchProjects = useCallback(async () => {
         try {
-            setIsLoading(true); // Use the passed setIsLoading
-            const options: {
-                status?: ProjectSchema['status'];
-                excludeStatus?: ProjectSchema['status'];
-                limit: number;
-                page: number;
-            } = {
-                limit: ITEMS_PER_PAGE,
-                page: currentPage,
-            };
-
-            if (filter.status) {
-                options.status = filter.status;
-            } else {
-                options.excludeStatus = 'archived'; // Exclude archived by default
-            }
-
-            const fetchedProjects = await projectService.fetchProjects(options);
-            setProjects(fetchedProjects.data);
-            setTotalPages(fetchedProjects.totalPages);
+            const fetchedProjects = await projectService.fetchProjects({excludeStatus: 'archived'});
+            setProjects(fetchedProjects.data.map(p => ({ id: p.id, name: p.name})));
 
         } catch (error) {
             console.error('Erro ao buscar projetos:', error);
-        } finally {
-            setIsLoading(false); // Use the passed setIsLoading
+            setError('Erro ao buscar projetos.'); // Set error state
         }
-    }, [currentPage, ITEMS_PER_PAGE]); // Correct dependencies: removed setLoading
+    }, []); // Correct dependencies
 
   useEffect(() => {
-    fetchProjects(filter, setIsLoading) // Pass filter and setIsLoading here
-  }, [filter, currentPage, debouncedSearchTerm, fetchProjects]); // Use debouncedSearchTerm
+    fetchProjects()
+  }, [fetchProjects]);
 
-
-  const handleDeleteProject = async () => {
-    if (!selectedProject) return
-
-    try {
-      await projectService.deleteProject(selectedProject.id)
-      setProjects(prevProjects =>
-        prevProjects.filter(project => project.id !== selectedProject.id)
-      )
-      setSelectedProject(null)
-      setIsDeleteModalOpen(false)
-    } catch (error) {
-      console.error('Erro ao excluir projeto:', error)
-    }
-  }
-
-  //const handleEditProject = (project: ProjectSchema) => { // REMOVED, NOT USED HERE
-  //  setSelectedProject(project)
-  //}
-
-  const handleDeleteConfirmation = (project: ProjectSchema) => {
-    setSelectedProject(project)
-    setIsDeleteModalOpen(true)
-  }
-
-  const handleProjectCreated = (newProject: ProjectSchema) => {
-    setProjects(prevProjects => [newProject, ...prevProjects])
-  }
-
-  const handleProjectUpdated = (updatedProject: ProjectSchema) => {
-    setProjects(prevProjects =>
-      prevProjects.map(project =>
-        project.id === updatedProject.id ? updatedProject : project
-      )
-    )
-  }
-
-  const handleArchiveProject = async (projectId: string) => {
-    try {
-      await projectService.archiveProject(projectId);
-      // Refresh the project list
-      fetchProjects(filter, setIsLoading); // Pass filter and setIsLoading
-    } catch (error) {
-      console.error('Error archiving project:', error);
-    }
-  };
-
-  const handleUnarchiveProject = async (projectId: string) => {
-    try {
-      await projectService.unarchiveProject(projectId);
-      // Refresh the project list
-      fetchProjects(filter, setIsLoading); // Pass filter and setIsLoading
-    } catch (error) {
-      console.error('Error unarchiving project:', error);
-    }
-  };
-
-
-
-  const StatusBadge: React.FC<{ status: ProjectSchema['status'] }> = ({ status }) => {
-    const statusStyles = {
-      planning: 'bg-yellow-100 text-yellow-800',
-      active: 'bg-green-100 text-green-800',
-      completed: 'bg-blue-100 text-blue-800',
-      paused: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800',
-      archived: 'bg-gray-400 text-white' // Style for archived status
-    }
-
-    const statusLabels = {
-      planning: 'Planejamento',
-      active: 'Ativo',
-      completed: 'Concluído',
-      paused: 'Pausado',
-      cancelled: 'Cancelado',
-      archived: 'Arquivado' // Label for archived status
-    }
-
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs ${statusStyles[status]}`}>
-        {statusLabels[status]}
-      </span>
-    )
-  }
 
   // Carregar dados
     const loadData = useCallback(async () => { // Use useCallback here
@@ -179,8 +76,7 @@ export const TaskManagement: React.FC = () => {
             setError(null)
 
             // Buscar projetos e usuários
-            const [projectsResponse, usersResponse, tasksResponse] = await Promise.all([
-                projectService.fetchProjects(),
+            const [usersResponse, tasksResponse] = await Promise.all([
                 userManagementService.fetchUsers(),
                 taskService.fetchTasks({
                     projectId: projectFilter || undefined,
@@ -189,12 +85,6 @@ export const TaskManagement: React.FC = () => {
                     page: currentPage
                 })
             ])
-
-            // Mapear projetos
-            setProjects(projectsResponse.data.map(p => ({
-                id: p.id,
-                name: p.name
-            })))
 
             // Mapear usuários
             const userMap = usersResponse.data.reduce((acc, user) => {
@@ -216,13 +106,13 @@ export const TaskManagement: React.FC = () => {
 
   useEffect(() => {
     loadData()
-  }, [loadData]); // Simplified dependency
+  }, [loadData, debouncedSearchTerm]); // Simplified dependency
 
   // Filtrar tarefas
   const filteredTasks = tasks.filter(task =>
     (searchTerm === '' ||
-      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.description.toLowerCase().includes(searchTerm.toLowerCase()))
+      task.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      task.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
   )
 
   // Componente de Badge de Status
@@ -372,14 +262,17 @@ export const TaskManagement: React.FC = () => {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-              {filteredTasks.map((task) => (
+              {filteredTasks.map((task) => {
+                const project = projects.find(p => p.id === task.projectId);
+                const assignedUserName = users[task.assignedTo] || 'N/A'; // Calculate assigned user's name *first*.
+                return (
                 <div
                   key={task.id}
                   className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 group"
                 >
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
-                      <h2 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition">
+                      <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition">
                         <Link to={`/tasks/${task.id}`}>{task.title}</Link> {/* Correct Link */}
                       </h2>
                       <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -405,17 +298,15 @@ export const TaskManagement: React.FC = () => {
                     <p className="text-gray-600 mb-4 line-clamp-2">
                       {task.description}
                     </p>
+                    <p className="text-sm text-gray-600 mb-2">
+                        Projeto: {project ? project.name : 'N/A'}
+                    </p>
 
                     <div className="flex justify-between items-center mb-4">
                       <div className="flex items-center space-x-2">
                         <Users className="text-gray-500" size={16} />
                         <span className="text-gray-600 text-sm truncate max-w-[150px]">
-                          {/* Corrected: Check if task.assignedTo is an array before mapping */}
-                          {Array.isArray(task.assignedTo)
-                            ? task.assignedTo
-                                .map(userId => users[userId] || userId)
-                                .join(', ')
-                            : 'Nenhum responsável atribuído'} {/* Handle non-array case */}
+                          {assignedUserName} {/* Use the assignedUserName variable */}
                         </span>
                       </div>
                       <StatusBadgeTask status={task.status} />
@@ -435,7 +326,8 @@ export const TaskManagement: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Paginação */}
@@ -464,24 +356,6 @@ export const TaskManagement: React.FC = () => {
         )}
 
         {/* Modais */}
-        {/*<CreateTaskModal
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          onTaskCreated={handleCreateTask}
-        />
-
-        {selectedTask && (
-          <>
-            <EditTaskModal
-              task={selectedTask}
-              isOpen={isEditModalOpen}
-              onClose={() => {
-                setIsEditModalOpen(false)
-                setSelectedTask(null)
-              }}
-              onTaskUpdated={handleUpdateTask}
-            />*/}
-
             <DeleteConfirmationModal
               isOpen={isDeleteModalOpen}
               onClose={() => {
@@ -492,11 +366,7 @@ export const TaskManagement: React.FC = () => {
               itemName={selectedTask ? selectedTask.title : ''}
               warningMessage="A exclusão de uma tarefa removerá permanentemente todas as suas informações do sistema."
             />
-          {/*</>
-        )}*/}
       </div>
     </Layout>
   )
 }
-
-export default TaskManagement

@@ -28,7 +28,7 @@ export interface ProjectSchema {
   createdBy: string
   createdAt: number
   updatedAt: number
-  messages?: {
+  messages?: {  // Keep for Project Chat
     id: string
     userId: string
     userName: string
@@ -41,7 +41,15 @@ export interface ProjectSchema {
       type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio'
       size?: number
     }[]
+    quotedMessage?: { // For quoted messages
+      userName: string;
+      content: string;
+      attachments?: any[];
+    }
+    originalMessageId?: string; // To update the original message
+    messageType?: 'task_submission' | 'task_approval' | 'general';
   }[]
+  commentTabs?: { id: string; name: string; comments: any[] }[]; // Keep for future use
 }
 
 // Task Schema
@@ -52,12 +60,12 @@ export interface TaskSchema {
   description: string;
   status: 'pending' | 'in_progress' | 'waiting_approval' | 'completed' | 'blocked';
   priority: 'low' | 'medium' | 'high' | 'critical';
-  assignedTo: string[]; // Changed back to string[]
+  assignedTo: string; // Single user ID
   createdBy: string; // User ID
-  startDate?: number;
+  startDate: number; // Start date
   dueDate: number;
   completedAt?: number;
-  difficultyLevel: number; // Difficulty level 0-10
+  difficultyLevel: number; // Difficulty level 2-9
   coinsReward: number; // Calculated reward
   subtasks?: {
     id: string;
@@ -75,7 +83,7 @@ export interface TaskSchema {
   attachments?: string[]; // URLs or file references
   createdAt: number;
   updatedAt: number;
-  actions: TaskAction[]; // NEW: Array of actions
+  actions: TaskAction[]; // Array of actions
 }
 
 //  Interface for a task action
@@ -93,6 +101,7 @@ export interface TaskAction {
     hasAttachments?: boolean;   // Flag for required attachments
     data?: {
         fileURLs?: string[];    // NEW: Array of file URLs for 'info' type
+        steps?: any[];          // Keep steps for document type
     };
     attachments?: {             // Attachments specific to THIS action step
         id: string;
@@ -149,17 +158,17 @@ export interface ActionTemplateSchema {
       weeklyReports: boolean
     }
 
-    // Activity Log Schema
-export interface ActivityLogSchema {
-  id: string;
-  userId: string;
-  userName: string;
-  type: 'project_created' | 'project_updated' | 'task_created' | 'task_updated' | 'task_completed' | 'user_login' | 'user_created' | 'task_status_update' | 'other'; // Added task_status_update
-  projectId?: string; // Optional, if related to a project
-  taskId?: string;    // Optional, if related to a task
-  projectName?: string; // NEW: Project name for easier display
-  taskName?: string;    // NEW: Task name for easier display
-  newStatus?: string;   // NEW: For status updates
-  details?: string;   // Optional, for additional details
-  timestamp: number;
-}
+   // Activity Log Schema
+    export interface ActivityLogSchema {
+      id: string;
+      userId: string;
+      userName: string;
+      type: 'project_created' | 'project_updated' | 'task_created' | 'task_updated' | 'task_completed' | 'user_login' | 'user_created' | 'task_status_update' | 'other'; // Added task_status_update
+      projectId?: string; // Optional, if related to a project
+      taskId?: string;    // Optional, if related to a task
+      projectName?: string; // NEW: Project name for easier display
+      taskName?: string;    // NEW: Task name for easier display
+      newStatus?: string;   // NEW: For status updates
+      details?: string;   // Optional, for additional details
+      timestamp: number;
+    }

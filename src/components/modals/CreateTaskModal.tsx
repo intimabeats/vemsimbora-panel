@@ -8,6 +8,7 @@ import {
     Info, // Import the Info icon
     File, //NEW
     Download, //NEW
+    Trash2
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -34,8 +35,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     title: '',
     description: '',
     projectId: projectId || '',
-    assignedTo: [] as string[],
+    assignedTo: '', // Changed to single string
     priority: 'medium' as TaskSchema['priority'],
+    startDate: new Date().toISOString().split('T')[0], // Added start date
     dueDate: new Date().toISOString().split('T')[0],
     difficultyLevel: 5,
     actions: [] as TaskAction[]
@@ -61,8 +63,9 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 title: '',
                 description: '',
                 projectId: projectId || '',
-                assignedTo: [],
+                assignedTo: '', // Reset to empty string
                 priority: 'medium',
+                startDate: new Date().toISOString().split('T')[0], // Reset start date
                 dueDate: new Date().toISOString().split('T')[0],
                 difficultyLevel: 5,
                 actions: []
@@ -113,7 +116,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     if (!formData.title.trim()) errors.title = 'Título é obrigatório';
     if (!formData.description.trim()) errors.description = 'Descrição é obrigatória';
     if (!formData.projectId) errors.projectId = 'Projeto é obrigatório';
-    if (formData.assignedTo.length === 0) errors.assignedTo = 'Pelo menos um responsável é obrigatório';
+    if (!formData.assignedTo) errors.assignedTo = 'Um responsável é obrigatório'; // Validate single assignee
+    if (!formData.startDate) errors.startDate = 'Data de início é obrigatória'; // Validate start date
     if (!formData.dueDate) errors.dueDate = 'Data de vencimento é obrigatória';
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -123,9 +127,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     const { name, value } = e.target
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'assignedTo'
-                ? Array.from((e.target as HTMLSelectElement).selectedOptions, option => option.value)
-                : value
+            [name]: value
         }));
     if (formErrors[name]) {
       setFormErrors(prev => {
@@ -162,39 +164,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
   };
 
-    // NEW: Add an action manually
-    const handleAddAction = (type: TaskAction['type']) => {
-        let newAction: Partial<TaskAction> = {
-            id: Date.now().toString() + Math.random().toString(36).substring(7), // Unique ID
-            type: type,
-            title: '', // Default title
-            completed: false,
-        };
-
-        // If it's an 'info' type, add the specific fields
-        if (type === 'info') {
-            newAction = {
-                ...newAction,
-                infoTitle: '',
-                infoDescription: '',
-                hasAttachments: false,
-                data: {} // Initialize data
-            };
-        }
-
+    const handleRemoveAction = (actionId: string) => {
         setFormData(prev => ({
             ...prev,
-            actions: [...prev.actions, newAction as TaskAction],
-        }));
-    };
-
-    // NEW: Handle changes within an action
-    const handleActionChange = (actionId: string, field: keyof TaskAction, value: any) => {
-        setFormData(prev => ({
-            ...prev,
-            actions: prev.actions.map(action =>
-                action.id === actionId ? { ...action, [field]: value } : action
-            ),
+            actions: prev.actions.filter(action => action.id !== actionId)
         }));
     };
 
@@ -218,6 +191,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       const newTask = await taskService.createTask({
         ...formData,
         status: 'pending',
+        startDate: new Date(formData.startDate).getTime(), // Convert start date
         dueDate: new Date(formData.dueDate).getTime(),
         coinsReward
       });
@@ -321,16 +295,16 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Responsáveis
+              Responsável
             </label>
             <select
-              multiple
               name="assignedTo"
               value={formData.assignedTo}
               onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.assignedTo ? 'border-red-500' : 'focus:ring-blue-500'
+              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.assignedTo ? 'border-red-500' : 'focus:ring-blue-500'
                 }`}
             >
+              <option value="">Selecione um responsável</option> {/* Added a default option */}
               {users.map(user => (
                 <option key={user.id} value={user.id}>
                   {user.name}
@@ -343,10 +317,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nível de Dificuldade (1-10)
+              Nível de Dificuldade (2-9)
             </label>
             <div className="flex space-x-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(level => (
+              {[2, 3, 4, 5, 6, 7, 8, 9].map(level => (
                 <button
                   key={level}
                   type="button"
@@ -362,21 +336,40 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data de Vencimento
-            </label>
-            <input
-              type="date"
-              name="dueDate"
-              value={formData.dueDate}
-              onChange={handleChange}
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dueDate ? 'border-red-500' : 'focus:ring-blue-500'
-                }`}
-            />
-            {formErrors.dueDate && (
-              <p className="text-red-500 text-xs mt-1">{formErrors.dueDate}</p>
-            )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Início
+              </label>
+              <input
+                type="date"
+                name="startDate"
+                value={formData.startDate}
+                onChange={handleChange}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.startDate ? 'border-red-500' : 'focus:ring-blue-500'
+                  }`}
+              />
+              {formErrors.startDate && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Data de Vencimento
+              </label>
+              <input
+                type="date"
+                name="dueDate"
+                value={formData.dueDate}
+                onChange={handleChange}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.dueDate ? 'border-red-500' : 'focus:ring-blue-500'
+                  }`}
+              />
+              {formErrors.dueDate && (
+                <p className="text-red-500 text-xs mt-1">{formErrors.dueDate}</p>
+              )}
+            </div>
           </div>
 
           {/* Action Templates */}
@@ -405,23 +398,6 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               >
                 Adicionar
               </button>
-            </div>
-          </div>
-
-          {/* NEW: Add Action Buttons */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Adicionar Ação Manualmente
-            </label>
-            <div className="flex space-x-2">
-              <button
-                type="button"
-                onClick={() => handleAddAction('info')}
-                className="px-3 py-1 rounded-full text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
-              >
-                <Info size={16} className="mr-1" /> Informações Importantes
-              </button>
-              {/* Add other action type buttons here as needed */}
             </div>
           </div>
 
@@ -454,7 +430,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
                             />
                             {/* Display uploaded files for this specific action */}
-                            {attachments[action.id] && attachments[action.id].length > 0 && (
+                            {attachments[action.id] && attachments[actionId].length > 0 && (
                                 <div className="mt-2">
                                     <h4 className="font-semibold">Arquivos Carregados:</h4>
                                     <ul>
@@ -466,6 +442,14 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                             )}
                         </div>
                     )}
+                    <button
+                        type="button"
+                        onClick={() => handleRemoveAction(action.id)}
+                        className="text-red-500 hover:text-red-700"
+                        title="Remover ação"
+                    >
+                        <Trash2 size={16} />
+                    </button>
                 </div>
             ))}
             </div>
