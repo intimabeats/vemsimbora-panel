@@ -127,7 +127,7 @@ useEffect(() => {
       const newProject = await projectService.createProject({
         ...formData,
         startDate: new Date(formData.startDate).getTime(),
-        endDate: formData.endDate ? new Date(formData.endDate).getTime() : null,
+        endDate: formData.endDate ? new Date(formData.endDate).getTime() : undefined,
         managers: formData.managers
       })
 

@@ -3,7 +3,9 @@ import {
   UserPlus,
   X,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { userManagementService } from '../../services/UserManagementService'
 import { Validation } from '../../utils/validation'
@@ -29,6 +31,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   const [errors, setErrors] = useState<{[key: string]: string}>({})
   const [isLoading, setIsLoading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false) // Added for password visibility toggle
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {}
@@ -71,8 +74,8 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
         name: formData.name,
         email: formData.email,
         role: formData.role,
-        status: 'active',
-        coins: 0
+        status: 'active'
+        // coins is handled by the service with a default value of 0
       }, formData.password) // Pass the password
 
       onUserCreated(newUser)
@@ -106,6 +109,19 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
     }
   }
 
+  // Reset form when modal closes
+  const handleClose = () => {
+    setFormData({
+      name: '',
+      email: '',
+      role: 'employee',
+      password: ''
+    });
+    setErrors({});
+    setServerError(null);
+    onClose();
+  }
+
   if (!isOpen) return null
 
   return (
@@ -117,7 +133,7 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
             Criar Novo Usuário
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-700"
           >
             <X size={24} />
@@ -188,22 +204,34 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
             >
               Senha
             </label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Senha"
-              className={`w-full px-4 py-2 border rounded-lg focus:outline-none 
-                ${errors.password
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'focus:ring-2 focus:ring-blue-500'
-                }`}
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Senha"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none pr-10
+                  ${errors.password
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'focus:ring-2 focus:ring-blue-500'
+                  }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
             {errors.password && (
               <p className="text-red-500 text-xs mt-1">{errors.password}</p>
             )}
+            <p className="text-xs text-gray-500 mt-1">
+              A senha deve ter pelo menos 8 caracteres, incluindo maiúsculas, minúsculas, números e caracteres especiais.
+            </p>
           </div>
 
           <div>
@@ -243,7 +271,15 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
                   : 'bg-blue-600 hover:bg-blue-700'
                 }`}
             >
-              {isLoading ? 'Criando...' : 'Criar Usuário'}
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Criando...
+                </div>
+              ) : 'Criar Usuário'}
             </button>
           </div>
         </form>

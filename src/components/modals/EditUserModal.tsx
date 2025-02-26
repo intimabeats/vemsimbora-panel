@@ -98,8 +98,8 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
         }
       })
 
-      // Pass the selectedFile to updateUser
-      const updatedUser = await userManagementService.updateUser(user.id, updateData, selectedFile);
+      // Pass the selectedFile to updateUser, but ensure it's undefined (not null) when no file is selected
+      const updatedUser = await userManagementService.updateUser(user.id, updateData, selectedFile || undefined);
       onUserUpdated(updatedUser);
       onClose()
     } catch (error: any) {

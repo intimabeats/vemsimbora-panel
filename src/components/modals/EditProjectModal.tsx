@@ -137,10 +137,10 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
         description: formData.description,
         startDate: formData.startDate
           ? new Date(formData.startDate).getTime()
-          : null, // Correct: null if no start date
+          : undefined, // Changed from null to undefined
         endDate: formData.endDate
           ? new Date(formData.endDate).getTime()
-          : null, // Correct: null if no end date
+          : undefined, // Changed from null to undefined
         status: formData.status,
         managers: formData.managers
       }
