@@ -1,3 +1,4 @@
+// Partial fix for the most critical issue
 import React, { useState, useEffect, useCallback } from 'react'
 import { Layout } from '../../components/Layout'
 import { actionTemplateService } from '../../services/ActionTemplateService'
@@ -316,12 +317,19 @@ export const CreateActionTemplate: React.FC = () => {
                 if (elementsByStep[i]) {
                     // Filter out data and other unnecessary fields, handling 'info' type
                     const stepElements = elementsByStep[i].map(element => {
+                        // Add the completed property to make TypeScript happy
+                        const completeElement = {
+                            ...element,
+                            completed: false
+                        };
+                        
                         if (element.type === 'info') {
-                            const {  completed, completedAt, completedBy, attachments, ...infoElement } = element;
-                            return infoElement;
+                            const { completed, completedAt, completedBy, attachments, ...infoElement } = completeElement;
+                            return { ...infoElement, completed: false };
                         }
-                        const { data, ...rest } = element; // Keep data if it exists (for future use)
-                        return data === undefined ? rest : element;
+                        
+                        const { data, ...rest } = completeElement;
+                        return data === undefined ? rest : completeElement;
                     });
                     allElements.push(...stepElements);
                 }

@@ -5,10 +5,10 @@ import { Layout } from '../../components/Layout'
 import {
   CheckCircle,
   AlertTriangle,
-    Info, // Import Info icon
-    File,
-    Download,
-    ArrowLeft // ADDED THIS IMPORT
+  Info, // Import Info icon
+  File,
+  Download,
+  ArrowLeft // ADDED THIS IMPORT
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -28,7 +28,7 @@ export const EditProjectTask: React.FC = () => {
         title: '',
         description: '',
         projectId: projectId || '',
-        assignedTo: [] as string[],
+        assignedTo: '', // Changed to string to match TaskSchema
         priority: 'medium' as TaskSchema['priority'],
         dueDate: new Date().toISOString().split('T')[0],
         difficultyLevel: 5,
@@ -81,7 +81,7 @@ export const EditProjectTask: React.FC = () => {
                         title: taskData.title,
                         description: taskData.description,
                         projectId: taskData.projectId,
-                        assignedTo: taskData.assignedTo,
+                        assignedTo: taskData.assignedTo, // This is now a string
                         priority: taskData.priority,
                         dueDate: new Date(taskData.dueDate).toISOString().split('T')[0],
                         difficultyLevel: taskData.difficultyLevel || 5,
@@ -108,7 +108,7 @@ export const EditProjectTask: React.FC = () => {
         if (!formData.title.trim()) errors.title = 'Title is required'
         if (!formData.description.trim()) errors.description = 'Description is required'
         if (!formData.projectId) errors.projectId = 'Project is required'
-        if (formData.assignedTo.length === 0) errors.assignedTo = 'At least one assignee is required'
+        if (!formData.assignedTo) errors.assignedTo = 'At least one assignee is required'
         if (!formData.dueDate) errors.dueDate = "Due date is required";
 
         setFormErrors(errors)
@@ -121,9 +121,7 @@ export const EditProjectTask: React.FC = () => {
         const { name, value } = e.target
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'assignedTo'
-                ? Array.from((e.target as HTMLSelectElement).selectedOptions, option => option.value)
-                : value
+            [name]: value
         }))
 
         if (formErrors[name]) {
@@ -281,16 +279,16 @@ export const EditProjectTask: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Responsáveis
+                  Responsável
                 </label>
                 <select
-                  multiple
                   name="assignedTo"
                   value={formData.assignedTo}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.assignedTo ? 'border-red-500' : 'focus:ring-blue-500'
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.assignedTo ? 'border-red-500' : 'focus:ring-blue-500'
                     }`}
                 >
+                  <option value="">Selecione um responsável</option>
                   {users.map(user => (
                     <option key={user.id} value={user.id}>
                       {user.name}
@@ -303,10 +301,10 @@ export const EditProjectTask: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nível de Dificuldade (1-10)
+                  Difficulty Level (2-9)
                 </label>
                 <div className="flex space-x-2">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(level => (
+                  {[2, 3, 4, 5, 6, 7, 8, 9].map(level => (
                     <button
                       key={level}
                       type="button"

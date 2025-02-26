@@ -36,7 +36,7 @@ const LineNumber = Extension.create({
     },
 
     addNodeView() {
-        return ({ node, editor, getPos }) => {
+        return ({ node, editor, getPos }: { node: any, editor: any, getPos: any }) => {
             const dom = document.createElement('span');
             dom.classList.add('line-number');
             dom.style.width = `${this.options.width}px`;
@@ -294,7 +294,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
     const handleCompleteStep = () => {
         if (currentStep < (action.data?.steps?.length ?? 0) - 1) {
             setCurrentStep(currentStep + 1);
-            editor?.commands.setContent(action.data.steps[currentStep + 1].data || '');
+            editor?.commands.setContent(action.data?.steps?.[currentStep + 1]?.data || '');
         } else {
             // Prepare data for onComplete. For 'info' type, include uploadedFiles.
             let finalData: any = { ...stepData };
@@ -312,7 +312,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
         if (currentStep > 0) {
             setCurrentStep(currentStep - 1);
             // Load content for the previous step into the editor
-            editor?.commands.setContent(action.data.steps[currentStep - 1].data || '');
+            editor?.commands.setContent(action.data?.steps?.[currentStep - 1]?.data || '');
         }
     };
 

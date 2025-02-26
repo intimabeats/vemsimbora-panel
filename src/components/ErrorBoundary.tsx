@@ -21,7 +21,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    Sentry.captureException(error, { extra: errorInfo })
+    // Convert ErrorInfo to a plain object that Sentry can handle
+    const errorInfoObj = {
+      componentStack: errorInfo.componentStack
+    };
+    
+    Sentry.captureException(error, { extra: errorInfoObj })
   }
 
   render() {
