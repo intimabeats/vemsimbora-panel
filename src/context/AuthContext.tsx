@@ -17,6 +17,8 @@ import {
   getIdToken,
   sendPasswordResetEmail
 } from 'firebase/auth'
+import { getDoc, doc } from 'firebase/firestore'
+import { db } from '../config/firebase'
 
 // User roles type
 type UserRole = 'admin' | 'manager' | 'employee'
@@ -39,7 +41,7 @@ type AuthContextType = {
     employee: boolean
   }>
   resetPassword: (email: string) => Promise<void>
-  setCurrentUser: React.Dispatch<React.SetStateAction<ExtendedUser | null>> // Add setCurrentUser
+  setCurrentUser: React.Dispatch<React.SetStateAction<ExtendedUser | null>>
 }
 
 // Create context
@@ -54,7 +56,7 @@ const AuthContext = createContext<AuthContextType>({
     employee: false
   }),
   resetPassword: async () => { },
-  setCurrentUser: () => {} // Provide a default implementation
+  setCurrentUser: () => {}
 })
 
 // Auth provider component
@@ -62,38 +64,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [currentUser, setCurrentUser] = useState<ExtendedUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-
   const updateUser = useCallback(async (user: User | null) => {
-    console.log("AuthContext updateUser - user:", user); // Log the user object
+    console.log("AuthContext updateUser - user:", user);
     if (user) {
       try {
-        // Tentar restaurar dados do usuário do localStorage
+        // Try to restore user data from localStorage
         const storedUser = localStorage.getItem('user')
 
         if (storedUser) {
           const parsedUser = JSON.parse(storedUser)
-            console.log("AuthContext updateUser - storedUser:", parsedUser);
+          console.log("AuthContext updateUser - storedUser:", parsedUser);
 
-          // Verificar validade do token
-          const token = await getIdToken(user, true)
+          // Verify token validity
+          await getIdToken(user, true)
 
-          setCurrentUser({
-            ...user,
-            role: parsedUser.role,
-            coins: parsedUser.coins
-          })
+          // Get fresh user data from Firestore to ensure it's up to date
+          const userDoc = await getDoc(doc(db, 'users', user.uid))
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            setCurrentUser({
+              ...user,
+              role: userData.role,
+              coins: userData.coins
+            })
+            
+            // Update localStorage with fresh data
+            localStorage.setItem('user', JSON.stringify({
+              role: userData.role,
+              coins: userData.coins
+            }))
+          } else {
+            // If user document doesn't exist in Firestore, use stored data
+            setCurrentUser({
+              ...user,
+              role: parsedUser.role,
+              coins: parsedUser.coins
+            })
+          }
         } else {
-          // Se não houver dados no localStorage, buscar do Firestore
-          const userDoc = await AuthService.login(user.email!, '')
-            console.log("AuthContext updateUser - userDoc from Firestore:", userDoc);
-          setCurrentUser({
-            ...user,
-            role: userDoc.role,
-            coins: userDoc.coins
-          })
+          // If no data in localStorage, fetch from Firestore
+          const userDoc = await getDoc(doc(db, 'users', user.uid))
+          if (userDoc.exists()) {
+            const userData = userDoc.data()
+            setCurrentUser({
+              ...user,
+              role: userData.role,
+              coins: userData.coins
+            })
+            
+            // Save to localStorage
+            localStorage.setItem('user', JSON.stringify({
+              role: userData.role,
+              coins: userData.coins
+            }))
+          } else {
+            // If no user document found, set user without role/coins
+            setCurrentUser(user)
+          }
         }
       } catch (error) {
-        console.error('Erro ao restaurar sessão:', error)
+        console.error('Error restoring session:', error)
         setCurrentUser(null)
       }
     } else {
@@ -101,45 +131,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-
   useEffect(() => {
-    // Configurar listener de autenticação persistente
+    // Set up persistent authentication listener
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       await updateUser(user);
       setLoading(false)
     }, (error) => {
-      console.error('Erro no listener de autenticação:', error)
+      console.error('Authentication listener error:', error)
       setCurrentUser(null)
       setLoading(false)
     })
 
-    // Configurar listener de expiração de token
+    // Set up token expiration listener
     const tokenListener = setInterval(async () => {
       if (currentUser) {
         try {
           await getIdToken(currentUser, true)
         } catch (error) {
-          console.error('Token expirado:', error)
+          console.error('Token expired:', error)
           await logout()
         }
       }
-    }, 30 * 60 * 1000) // Verificar a cada 30 minutos
+    }, 30 * 60 * 1000) // Check every 30 minutes
 
-    // Limpar listeners
+    // Clean up listeners
     return () => {
       unsubscribe()
       clearInterval(tokenListener)
     }
-  }, [updateUser]) // Add updateUser to the dependency array
+  }, [updateUser])
 
-
-  // Métodos de autenticação
+  // Authentication methods
   const login = async (email: string, password: string) => {
     try {
       const user = await AuthService.login(email, password)
-        console.log("AuthContext login - user after AuthService.login:", user); // Log after login
+      console.log("AuthContext login - user after AuthService.login:", user);
 
-      // Salvar dados no localStorage
+      // Save data to localStorage
       localStorage.setItem('user', JSON.stringify({
         role: user.role,
         coins: user.coins
@@ -148,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(user)
       return user
     } catch (error) {
-      console.error('Erro de login:', error)
+      console.error('Login error:', error)
       throw error
     }
   }
@@ -159,21 +187,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('user')
       setCurrentUser(null)
     } catch (error) {
-      console.error('Erro de logout:', error)
+      console.error('Logout error:', error)
       throw error
     }
   }
 
   const refreshToken = async () => {
     if (!currentUser) {
-      throw new Error('Nenhum usuário autenticado')
+      throw new Error('No authenticated user')
     }
     return TokenService.refreshToken(currentUser)
   }
 
   const checkTokenClaims = async () => {
     if (!currentUser) {
-      throw new Error('Nenhum usuário autenticado')
+      throw new Error('No authenticated user')
     }
     return TokenService.checkTokenClaims(currentUser)
   }
@@ -184,11 +212,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
       console.error("Error sending password reset email:", error);
-      throw error; // Re-throw the error to be caught in the component
+      throw error;
     }
   };
 
-  // Valor do contexto
+  // Context value
   const value = {
     currentUser,
     login,
@@ -196,7 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshToken,
     checkTokenClaims,
     resetPassword,
-    setCurrentUser // Expose setCurrentUser
+    setCurrentUser
   }
 
   return (
@@ -206,7 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   )
 }
 
-// Custom hook para usar o contexto de autenticação
+// Custom hook to use the auth context
 export const useAuth = () => {
   return useContext(AuthContext)
 }

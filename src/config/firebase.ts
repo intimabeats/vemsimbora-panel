@@ -1,3 +1,4 @@
+// src/config/firebase.ts
 import { initializeApp } from 'firebase/app'
 import {
   getAuth,
@@ -8,8 +9,8 @@ import {
   updateProfile,
   setPersistence,
   browserLocalPersistence,
-  reauthenticateWithCredential, // Import reauthenticateWithCredential
-  EmailAuthProvider // Import EmailAuthProvider
+  reauthenticateWithCredential,
+  EmailAuthProvider
 } from 'firebase/auth'
 import {
   getFirestore,
@@ -21,15 +22,15 @@ import {
 } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
-// Firebase configuration
+// Firebase configuration - use environment variables when available, fallback to hardcoded values for development
 const firebaseConfig = {
-  apiKey: "AIzaSyAU0TCTTobySafDi-9Y68C5eyOD-gmU7nw",
-  authDomain: "vem-simbora.firebaseapp.com",
-  projectId: "vem-simbora",
-  storageBucket: "vem-simbora.firebasestorage.app",
-  messagingSenderId: "403932059706",
-  appId: "1:403932059706:web:5a7e01eebf7be71769bd03",
-  measurementId: "G-31XN454YCP"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAU0TCTTobySafDi-9Y68C5eyOD-gmU7nw",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "vem-simbora.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "vem-simbora",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "vem-simbora.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "403932059706",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:403932059706:web:5a7e01eebf7be71769bd03",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-31XN454YCP"
 }
 
 // Initialize Firebase
@@ -38,10 +39,10 @@ const auth = getAuth(app)
 const db = getFirestore(app)
 const storage = getStorage(app)
 
-// Configurar persistência de sessão
+// Configure session persistence
 setPersistence(auth, browserLocalPersistence)
   .catch((error) => {
-    console.error('Erro ao configurar persistência:', error)
+    console.error('Error setting persistence:', error)
   })
 
 // User roles type
@@ -52,10 +53,29 @@ export const AuthService = {
   // Login user
   login: async (email: string, password: string) => {
     try {
+      // If password is empty, it means we're just trying to get user data
+      // This is used when restoring a session
+      if (!password) {
+        // Get user data from Firestore directly
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser?.uid || ''))
+        
+        if (!userDoc.exists()) {
+          throw new Error('User data not found')
+        }
+        
+        const userData = userDoc.data()
+        
+        return {
+          ...auth.currentUser,
+          role: userData.role,
+          coins: userData.coins
+        }
+      }
+      
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
 
-      // Buscar dados adicionais do usuário
+      // Get additional user data
       const userDoc = await getDoc(doc(db, 'users', user.uid))
 
       if (userDoc.exists()) {
@@ -68,9 +88,9 @@ export const AuthService = {
         }
       }
 
-      throw new Error('Dados do usuário não encontrados')
-    } catch (error) {
-      console.error('Erro de login:', error)
+      throw new Error('User data not found')
+    } catch (error: any) {
+      console.error('Login error:', error)
       throw error
     }
   },
@@ -83,21 +103,23 @@ export const AuthService = {
     role: UserRole
   ) => {
     try {
-      // Criar usuário no Firebase Authentication
+      // Create user in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
 
-      // Atualizar perfil
+      // Update profile
       await updateProfile(user, { displayName: name })
 
-      // Criar documento no Firestore
+      // Create document in Firestore
       const userData = {
         id: user.uid,
         name,
         email,
         role,
         coins: 0,
-        status: 'active'
+        status: 'active',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
       }
 
       await setDoc(doc(db, 'users', user.uid), userData)
@@ -107,7 +129,7 @@ export const AuthService = {
         ...userData
       }
     } catch (error) {
-      console.error('Erro de registro:', error)
+      console.error('Registration error:', error)
       throw error
     }
   },
@@ -117,7 +139,7 @@ export const AuthService = {
     try {
       await signOut(auth)
     } catch (error) {
-      console.error('Erro de logout:', error)
+      console.error('Logout error:', error)
       throw error
     }
   },
@@ -127,7 +149,7 @@ export const AuthService = {
     try {
       await sendPasswordResetEmail(auth, email)
     } catch (error) {
-      console.error('Erro de redefinição de senha:', error)
+      console.error('Password reset error:', error)
       throw error
     }
   },
@@ -135,7 +157,10 @@ export const AuthService = {
   updateProfile: async (userId: string, updates: any) => {
     try {
       const userRef = doc(db, 'users', userId)
-      await updateDoc(userRef, updates)
+      await updateDoc(userRef, {
+        ...updates,
+        updatedAt: Date.now()
+      })
 
       // Update the user's profile in Firebase Authentication
       if (auth.currentUser) {
@@ -147,31 +172,29 @@ export const AuthService = {
           authUpdates.photoURL = updates.photoURL;
         }
         if (Object.keys(authUpdates).length > 0) {
-          console.log("firebase.ts - Updating auth profile with:", authUpdates); // Log auth updates
+          console.log("firebase.ts - Updating auth profile with:", authUpdates);
           await updateProfile(auth.currentUser, authUpdates);
-          console.log("firebase.ts - Auth profile updated successfully"); // Log success
+          console.log("firebase.ts - Auth profile updated successfully");
         }
       }
-
-
     } catch (error) {
-      console.error('Erro ao atualizar perfil:', error)
+      console.error('Profile update error:', error)
       throw error
     }
   },
 
-    // Reauthenticate user  -- ADDED THIS METHOD
+  // Reauthenticate user
   reauthenticate: async (email: string, password: string) => {
     try {
       const user = auth.currentUser
       if (!user) {
-        throw new Error('Nenhum usuário autenticado')
+        throw new Error('No authenticated user')
       }
       const credential = EmailAuthProvider.credential(email, password)
       await reauthenticateWithCredential(user, credential)
       return true // Return true on success
     } catch (error) {
-      console.error('Erro de reautenticação:', error)
+      console.error('Reauthentication error:', error)
       return false // Return false on failure
     }
   }
@@ -179,17 +202,17 @@ export const AuthService = {
 
 // Token service
 export const TokenService = {
-  // Atualizar token manualmente
+  // Manually refresh token
   refreshToken: async (user: any) => {
     try {
       return await user.getIdToken(true)
     } catch (error) {
-      console.error('Erro ao atualizar token:', error)
+      console.error('Token refresh error:', error)
       throw error
     }
   },
 
-  // Verificar claims do token
+  // Check token claims
   checkTokenClaims: async (user: any) => {
     try {
       const tokenResult = await user.getIdTokenResult()
@@ -199,7 +222,7 @@ export const TokenService = {
         employee: tokenResult.claims.employee === true
       }
     } catch (error) {
-      console.error('Erro ao verificar claims do token:', error)
+      console.error('Token claims check error:', error)
       return {
         admin: false,
         manager: false,
@@ -209,5 +232,5 @@ export const TokenService = {
   }
 }
 
-// Exportar serviços e configurações
+// Export services and configurations
 export { auth, db, storage }

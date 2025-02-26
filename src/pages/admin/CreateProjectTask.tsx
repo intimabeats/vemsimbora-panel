@@ -168,29 +168,56 @@ export const CreateProjectTask: React.FC = () => {
         }));
     };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!validateForm()) return;
 
-    setLoading(true);
-    setError(null);
+  setLoading(true);
+  setError(null);
 
-    try {
-      const newTask = await taskService.createTask({
-        ...formData,
-        status: 'pending',
-        dueDate: new Date(formData.dueDate).getTime(),
-        coinsReward
-      });
+  try {
+    // Prepare the task data
+    const taskData = {
+      ...formData,
+      status: 'pending',
+      startDate: new Date(formData.startDate).getTime(),
+      dueDate: new Date(formData.dueDate).getTime(),
+      coinsReward,
+      // Convert assignedTo from array to string (single assignee)
+      assignedTo: Array.isArray(formData.assignedTo) && formData.assignedTo.length > 0 
+        ? formData.assignedTo[0] 
+        : formData.assignedTo
+    };
 
-      navigate(`/admin/projects/${projectId}`);
-
-    } catch (err: any) {
-      setError(err.message || 'Falha ao criar tarefa');
-    } finally {
-      setLoading(false);
+    // Process any file uploads for info-type actions
+    for (const action of formData.actions) {
+      if (action.type === 'info' && action.hasAttachments && attachments[action.id]) {
+        // Upload files for this action
+        const uploadPromises = attachments[action.id].map(file => 
+          taskService.uploadTaskAttachment(taskId || 'temp', file)
+        );
+        
+        const fileUrls = await Promise.all(uploadPromises);
+        
+        // Update the action with file URLs
+        action.data = {
+          ...action.data,
+          fileURLs: fileUrls
+        };
+      }
     }
+
+    const newTask = await taskService.createTask(taskData);
+    console.log('Task created successfully:', newTask);
+    
+    navigate(`/admin/projects/${projectId}`);
+  } catch (err: any) {
+    console.error('Error creating task:', err);
+    setError(err.message || 'Failed to create task');
+  } finally {
+    setLoading(false);
   }
+};
 
 
   return (

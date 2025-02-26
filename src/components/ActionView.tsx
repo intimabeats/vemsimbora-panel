@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// src/components/ActionView.tsx
+import React, { useState, useEffect, useRef } from 'react';
 import { TaskAction } from '../types/firestore-schema';
 import { taskService } from '../services/TaskService';
 import { X, Bold, Italic, List, Link, Image as ImageIcon, Code, ListOrdered, AlignLeft, ChevronLeft, ChevronRight, FileText, File, Download } from 'lucide-react';
@@ -6,15 +7,15 @@ import { useAuth } from '../context/AuthContext';
 import { getDefaultProfileImage } from "../utils/user";
 import { userManagementService } from '../services/UserManagementService';
 import ReactDOM from 'react-dom';
-import { useEditor, EditorContent, Extension } from '@tiptap/react';
+import { useEditor, EditorContent, Editor, Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import LinkExtension from '@tiptap/extension-link';
 import ImageExtension from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
-import TextStyle from '@tiptap/extension-text-style'
-import { Color } from '@tiptap/extension-color'
-import TextAlign from '@tiptap/extension-text-align'
+import TextStyle from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
+import TextAlign from '@tiptap/extension-text-align';
 
 interface ActionViewProps {
   action: TaskAction;
@@ -201,13 +202,13 @@ export const EditorToolbar: React.FC<{ editor: Editor | null }> = ({ editor }) =
 
 export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCancel, taskId, isOpen }) => {
   const [currentStep, setCurrentStep] = useState(0); // Track the current step
-  const [stepData, setStepData] = useState<{ [key: number]: any }>({}); // Store data for each step
+  const [stepData, setStepData] = useState<{ [key: number]: any }>({});
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<{ name: string; photoURL?: string } | null>(null);
   const { currentUser } = useAuth();
-    const [uploadedFiles, setUploadedFiles] = useState<{ [key: number]: string[] }>({}); // Store uploaded file URLs
-
+  const [uploadedFiles, setUploadedFiles] = useState<{ [key: number]: string[] }>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Lazily initialize the editor to avoid server-side rendering issues.
   const editor = useEditor({
@@ -356,7 +357,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                                 <textarea
                                     placeholder="Digite o texto longo..."
                                     value={stepData[currentStep] || ''}
-                                    onChange={handleTextChange}
+                                    onChange={(e) => setStepData(prev => ({...prev, [currentStep]: e.target.value}))}
                                     className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 h-32 text-gray-900"
                                 />
                             )}
@@ -366,6 +367,7 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                                         type="file"
                                         onChange={handleFileUpload}
                                         disabled={isUploading}
+                                        ref={fileInputRef}
                                     />
                                     {stepData[currentStep]?.fileUrl && (
                                         <a href={stepData[currentStep].fileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
@@ -403,8 +405,48 @@ export const ActionView: React.FC<ActionViewProps> = ({ action, onComplete, onCa
                                     <p className="text-gray-600">{currentStepData.infoDescription}</p>
                                     {currentStepData.hasAttachments && (
                                         <>
-                                            {/* Removed file upload input */}
+                                            <div className="mt-4">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Upload de Arquivos
+                                                </label>
+                                                <input
+                                                    type="file"
+                                                    multiple
+                                                    onChange={handleFileUpload}
+                                                    disabled={isUploading}
+                                                    className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
+                                                />
+                                            </div>
                                             {isUploading && <p>Uploading...</p>}
+
+                                            {/* Display uploaded files */}
+                                            {uploadedFiles[currentStep] && uploadedFiles[currentStep].length > 0 && (
+                                                <div className="mt-4">
+                                                    <h4 className="font-semibold">Arquivos Enviados:</h4>
+                                                    <ul className="mt-2">
+                                                        {uploadedFiles[currentStep].map((url, index) => (
+                                                            <li key={index} className="flex items-center mb-2">
+                                                                <File className="mr-2" size={16} />
+                                                                <a 
+                                                                    href={url} 
+                                                                    target="_blank" 
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-600 hover:underline mr-2"
+                                                                >
+                                                                    {url.split('/').pop()}
+                                                                </a>
+                                                                <a 
+                                                                    href={url} 
+                                                                    download 
+                                                                    className="text-gray-600 hover:text-gray-800"
+                                                                >
+                                                                    <Download size={16} />
+                                                                </a>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
 
                                             {/* Display file download links if available */}
                                             {currentStepData.data?.fileURLs && currentStepData.data.fileURLs.length > 0 && (

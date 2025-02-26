@@ -1,3 +1,4 @@
+// src/pages/admin/ProjectDetails.tsx
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
@@ -14,7 +15,11 @@ import {
   ArrowLeft,
   Music,
   Plus,
-  Edit
+  Edit,
+  Eye,
+  Calendar,
+  Users as UsersIcon,
+  AlertCircle
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
 import { taskService } from '../../services/TaskService'
@@ -37,25 +42,25 @@ const FileItem: React.FC<{
   const getAttachmentIcon = () => {
     switch (attachment.type) {
       case 'image':
-        return <Image size={48} className="text-gray-600" />;
+        return <Image size={48} className="text-blue-500" />;
       case 'video':
-        return <Video size={48} className="text-gray-600" />;
+        return <Video size={48} className="text-red-500" />;
       case 'document':
-        return <FileText size={48} className="text-gray-600" />;
+        return <FileText size={48} className="text-green-500" />;
       case 'audio':
-        return <Music size={48} className="text-gray-600" />;
+        return <Music size={48} className="text-purple-500" />;
       default:
-        return <File size={48} className="text-gray-600" />;
+        return <File size={48} className="text-gray-500" />;
     }
   };
 
   return (
-    <div className="flex flex-col items-center w-48 p-4 bg-white rounded-lg shadow-md border">
+    <div className="flex flex-col items-center w-48 p-4 bg-white rounded-lg shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
       {getAttachmentIcon()}
       <a
         href={attachment.url}
         download={attachment.name}
-        className="mt-2 text-sm text-gray-700 hover:underline truncate text-center"
+        className="mt-2 text-sm text-gray-700 hover:underline truncate text-center w-full"
         title={attachment.name}
       >
         {attachment.name}
@@ -65,7 +70,7 @@ const FileItem: React.FC<{
         download={attachment.name}
         className="mt-2 px-4 py-1 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center"
       >
-        <Download size={14} />
+        <Download size={14} className="mr-1" /> Download
       </a>
     </div>
   )
@@ -84,6 +89,12 @@ export const ProjectDetails: React.FC = () =>
   const [tasks, setTasks] = useState<TaskSchema[]>([])
   const [users, setUsers] = useState<{ [key: string]: { name: string, profileImage?: string } }>({})
   const [attachments, setAttachments] = useState<any[]>([]);
+  const [tasksByStatus, setTasksByStatus] = useState<{[key: string]: TaskSchema[]}>({
+    pending: [],
+    in_progress: [],
+    waiting_approval: [],
+    completed: []
+  });
 
   // Load project data
   useEffect(() => {
@@ -113,10 +124,21 @@ export const ProjectDetails: React.FC = () =>
           return acc;
         }, []);
 
+        // Group tasks by status
+        const grouped = tasksResponse.data.reduce((acc, task) => {
+          const status = task.status;
+          if (!acc[status]) {
+            acc[status] = [];
+          }
+          acc[status].push(task);
+          return acc;
+        }, {} as {[key: string]: TaskSchema[]});
+
         setProject(projectData)
         setTasks(tasksResponse.data)
         setUsers(userMap)
         setAttachments(extractedAttachments);
+        setTasksByStatus(grouped);
 
       } catch (err: any) {
         console.error('Error loading project data:', err)
@@ -167,84 +189,10 @@ export const ProjectDetails: React.FC = () =>
     return (
       <Layout role="admin" isLoading={false}>
         <div className="container mx-auto p-6">
-          {project ? (
-            <>
-              <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
-                      {project.name || 'Projeto sem nome'}
-                    </h1>
-                    <p className="text-gray-600 mt-2">
-                      {project.description || 'Sem descrição'}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <StatusBadge status={project.status || 'planning'} />
-                    <button
-                      onClick={() => navigate(`/admin/projects/${project.id}/chat`)}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                    >
-                      <MessageCircle className="mr-2" size={20} />
-                      Chat do Projeto
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <span className="text-sm text-gray-500">Data de Início</span>
-                    <p className="font-medium">
-                      {new Date(project.startDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  {project.endDate && (
-                    <div>
-                      <span className="text-sm text-gray-500">Data de Término</span>
-                      <p className="font-medium">
-                        {new Date(project.endDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-sm text-gray-500">Gestores</span>
-                    <div className="flex items-center mt-1">
-                      {project.managers.map((managerId) => {
-                        const manager = users[managerId];
-                        return (
-                          <div key={managerId} className="relative w-8 h-8 rounded-full overflow-hidden mr-2">
-                            <img
-                              src={manager?.profileImage || getDefaultProfileImage(manager?.name)}
-                              alt={manager?.name || 'Unknown Manager'}
-                              className='object-cover w-full h-full'
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-gray-500">Progresso do Projeto</span>
-                    <span className="text-sm font-medium text-blue-600">
-                      {calculateProjectProgress()}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div
-                      className="bg-blue-600 h-2.5 rounded-full"
-                      style={{ width: `${calculateProjectProgress()}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative">
-              Projeto não encontrado
-            </div>
-          )}
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg flex items-center">
+            <AlertCircle className="mr-2" />
+            {error}
+          </div>
         </div>
       </Layout>
     )
@@ -283,7 +231,7 @@ export const ProjectDetails: React.FC = () =>
       completed: 'bg-blue-100 text-blue-800',
       paused: 'bg-gray-100 text-gray-800',
       cancelled: 'bg-red-100 text-red-800',
-      archived: 'bg-gray-400 text-white' // Style for archived status
+      archived: 'bg-gray-400 text-white'
     }
 
     const statusLabels = {
@@ -292,7 +240,31 @@ export const ProjectDetails: React.FC = () =>
       completed: 'Concluído',
       paused: 'Pausado',
       cancelled: 'Cancelado',
-      archived: 'Arquivado' // Label for archived status
+      archived: 'Arquivado'
+    }
+
+    return (
+      <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusStyles[status]}`}>
+        {statusLabels[status]}
+      </span>
+    )
+  }
+
+  const TaskStatusBadge: React.FC<{ status: TaskSchema['status'] }> = ({ status }) => {
+    const statusStyles = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      in_progress: 'bg-blue-100 text-blue-800',
+      waiting_approval: 'bg-purple-100 text-purple-800',
+      completed: 'bg-green-100 text-green-800',
+      blocked: 'bg-red-100 text-red-800'
+    }
+
+    const statusLabels = {
+      pending: 'Pendente',
+      in_progress: 'Em Andamento',
+      waiting_approval: 'Aguardando Aprovação',
+      completed: 'Concluída',
+      blocked: 'Bloqueada'
     }
 
     return (
@@ -309,7 +281,7 @@ export const ProjectDetails: React.FC = () =>
         <div className="flex justify-between items-center mb-6">
           <button
             onClick={() => navigate('/admin/projects')}
-            className="flex items-center text-gray-600 hover:text-gray-900"
+            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft className="mr-2" /> Voltar para Projetos
           </button>
@@ -324,7 +296,6 @@ export const ProjectDetails: React.FC = () =>
 
         {/* Project Header */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-
           <div className="flex justify-between items-center mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
@@ -335,32 +306,42 @@ export const ProjectDetails: React.FC = () =>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <div>
-              <span className="text-sm text-gray-500">Data de Início</span>
-              <p className="font-medium">
-                {new Date(project.startDate).toLocaleDateString()}
-              </p>
+            <div className="flex items-center space-x-2">
+              <Calendar className="text-blue-500" />
+              <div>
+                <span className="text-sm text-gray-500">Data de Início</span>
+                <p className="font-medium">
+                  {new Date(project.startDate).toLocaleDateString()}
+                </p>
+              </div>
             </div>
             {project.endDate && (
-              <div>
-                <span className="text-sm text-gray-500">Data de Término</span>
-                <p className="font-medium">
-                  {new Date(project.endDate).toLocaleDateString()}
-                </p>
+              <div className="flex items-center space-x-2">
+                <Calendar className="text-red-500" />
+                <div>
+                  <span className="text-sm text-gray-500">Data de Término</span>
+                  <p className="font-medium">
+                    {new Date(project.endDate).toLocaleDateString()}
+                  </p>
+                </div>
               </div>
             )}
             <div>
-              <span className="text-sm text-gray-500">Gestores</span>
+              <span className="text-sm text-gray-500 block mb-2">Gestores</span>
               <div className="flex items-center mt-1">
                 {project.managers.map((managerId) => {
                   const manager = users[managerId];
                   return (
-                    <div key={managerId} className="relative w-8 h-8 rounded-full overflow-hidden mr-2">
+                    <div key={managerId} className="relative w-8 h-8 rounded-full overflow-hidden mr-2 group">
                       <img
                         src={manager?.profileImage || getDefaultProfileImage(manager?.name)}
                         alt={manager?.name || 'Unknown Manager'}
                         className='object-cover w-full h-full'
                       />
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity"></div>
+                      <span className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs text-center py-0.5 opacity-0 group-hover:opacity-100 transition-opacity truncate">
+                        {manager?.name?.split(' ')[0] || 'Unknown'}
+                      </span>
                     </div>
                   );
                 })}
@@ -378,7 +359,7 @@ export const ProjectDetails: React.FC = () =>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2.5">
               <div
-                className="bg-blue-600 h-2.5 rounded-full"
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
                 style={{ width: `${calculateProjectProgress()}%` }}
               />
             </div>
@@ -387,7 +368,7 @@ export const ProjectDetails: React.FC = () =>
 
         {/* Tasks Section */}
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold flex items-center">
               <CheckCircle className="mr-2 text-blue-600" /> Tarefas do Projeto
             </h2>
@@ -401,62 +382,281 @@ export const ProjectDetails: React.FC = () =>
           </div>
 
           {tasks.length === 0 ? (
-            <p className="text-gray-500 text-center">Nenhuma tarefa encontrada</p>
+            <div className="text-center py-8 bg-gray-50 rounded-lg border border-gray-200">
+              <CheckCircle className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-lg font-medium text-gray-900">Nenhuma tarefa encontrada</h3>
+              <p className="mt-1 text-sm text-gray-500">Comece criando uma nova tarefa para este projeto.</p>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tasks.map(task => (
-                <div
-                  key={task.id}
-                  className="border rounded-lg p-4 hover:shadow-md transition"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-gray-900">
-                      <Link to={`/admin/projects/${projectId}/edit-task/${task.id}`} className="hover:underline">
-                        {task.title}
-                      </Link>
-                    </h3>
-                    {/* Add Edit Icon Here */}
-                    <Link
-                        to={`/admin/projects/${projectId}/edit-task/${task.id}`}
-                        className="text-blue-500 hover:text-blue-700"
-                        title="Editar Tarefa"
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Pending Tasks */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+                  <Clock className="mr-2 text-yellow-500" size={18} />
+                  Pendentes ({tasksByStatus.pending?.length || 0})
+                </h3>
+                <div className="space-y-3">
+                  {tasksByStatus.pending?.map(task => (
+                    <div
+                      key={task.id}
+                      className="bg-white p-3 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
                     >
-                        <Edit size={20} />
-                    </Link>
-                    <span className={`
-                      px-2 py-1 rounded-full text-xs
-                      ${task.status === 'completed'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                      }
-                    `}>
-                      {task.status === 'completed' ? 'Concluída' : 'Em Andamento'}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-                  <div className="flex justify-between items-center text-sm text-gray-500">
-                    <span>Prazo: {new Date(task.dueDate).toLocaleDateString()}</span>
-                    <span>Recompensa: {task.coinsReward} moedas</span>
-                  </div>
+                      <div className="flex justify-between items-start mb-2">
+                        <Link 
+                          to={`/tasks/${task.id}`} 
+                          className="font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          {task.title}
+                        </Link>
+                        <div className="flex space-x-1">
+                          <Link
+                            to={`/tasks/${task.id}`}
+                            className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                            title="Ver Detalhes"
+                          >
+                            <Eye size={16} />
+                          </Link>
+                          <Link
+                            to={`/admin/projects/${projectId}/edit-task/${task.id}`}
+                            className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                            title="Editar Tarefa"
+                          >
+                            <Edit size={16} />
+                          </Link>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2 mb-2">{task.description}</p>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-500">
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </span>
+                        <div className="flex items-center">
+                          <span className="text-yellow-600 font-medium mr-1">{task.coinsReward}</span>
+                          <span>🪙</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {(!tasksByStatus.pending || tasksByStatus.pending.length === 0) && (
+                    <p className="text-center text-gray-500 text-sm py-2">Nenhuma tarefa pendente</p>
+                  )}
                 </div>
-              ))}
+              </div>
+
+              {/* In Progress Tasks */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+                  <BarChart2 className="mr-2 text-blue-500" size={18} />
+                  Em Andamento ({tasksByStatus.in_progress?.length || 0})
+                </h3>
+                <div className="space-y-3">
+                  {tasksByStatus.in_progress?.map(task => (
+                    <div
+                      key={task.id}
+                      className="bg-white p-3 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <Link 
+                          to={`/tasks/${task.id}`} 
+                          className="font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          {task.title}
+                        </Link>
+                        <div className="flex space-x-1">
+                          <Link
+                            to={`/tasks/${task.id}`}
+                            className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                            title="Ver Detalhes"
+                          >
+                            <Eye size={16} />
+                          </Link>
+                          <Link
+                            to={`/admin/projects/${projectId}/edit-task/${task.id}`}
+                            className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                            title="Editar Tarefa"
+                          >
+                            <Edit size={16} />
+                          </Link>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2 mb-2">{task.description}</p>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-500">
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </span>
+                        <div className="flex items-center">
+                          <span className="text-yellow-600 font-medium mr-1">{task.coinsReward}</span>
+                          <span>🪙</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {(!tasksByStatus.in_progress || tasksByStatus.in_progress.length === 0) && (
+                    <p className="text-center text-gray-500 text-sm py-2">Nenhuma tarefa em andamento</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Waiting Approval Tasks */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+                  <Clock className="mr-2 text-purple-500" size={18} />
+                  Aguardando Aprovação ({tasksByStatus.waiting_approval?.length || 0})
+                </h3>
+                <div className="space-y-3">
+                  {tasksByStatus.waiting_approval?.map(task => (
+                    <div
+                      key={task.id}
+                      className="bg-white p-3 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <Link 
+                          to={`/tasks/${task.id}`} 
+                          className="font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          {task.title}
+                        </Link>
+                        <div className="flex space-x-1">
+                          <Link
+                            to={`/tasks/${task.id}`}
+                            className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                            title="Ver Detalhes"
+                          >
+                            <Eye size={16} />
+                          </Link>
+                          <Link
+                            to={`/admin/projects/${projectId}/edit-task/${task.id}`}
+                            className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                            title="Editar Tarefa"
+                          >
+                            <Edit size={16} />
+                          </Link>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2 mb-2">{task.description}</p>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-500">
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </span>
+                        <div className="flex items-center">
+                          <span className="text-yellow-600 font-medium mr-1">{task.coinsReward}</span>
+                          <span>🪙</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {(!tasksByStatus.waiting_approval || tasksByStatus.waiting_approval.length === 0) && (
+                    <p className="text-center text-gray-500 text-sm py-2">Nenhuma tarefa aguardando aprovação</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Completed Tasks */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="font-medium text-gray-700 mb-3 flex items-center">
+                  <CheckCircle className="mr-2 text-green-500" size={18} />
+                  Concluídas ({tasksByStatus.completed?.length || 0})
+                </h3>
+                <div className="space-y-3">
+                  {tasksByStatus.completed?.map(task => (
+                    <div
+                      key={task.id}
+                      className="bg-white p-3 rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <Link 
+                          to={`/tasks/${task.id}`} 
+                          className="font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                          {task.title}
+                        </Link>
+                        <div className="flex space-x-1">
+                          <Link
+                            to={`/tasks/${task.id}`}
+                            className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+                            title="Ver Detalhes"
+                          >
+                            <Eye size={16} />
+                          </Link>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 line-clamp-2 mb-2">{task.description}</p>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-500">
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </span>
+                        <div className="flex items-center">
+                          <span className="text-yellow-600 font-medium mr-1">{task.coinsReward}</span>
+                          <span>🪙</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {(!tasksByStatus.completed || tasksByStatus.completed.length === 0) && (
+                    <p className="text-center text-gray-500 text-sm py-2">Nenhuma tarefa concluída</p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
+
         {/* Files Section */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <File className="mr-2 text-blue-600" /> Arquivos do Projeto
-          </h2>
-          {attachments.length === 0 ? (
-            <p className="text-gray-500 text-center">Nenhum arquivo encontrado</p>
-          ) : (
-            <div className="flex space-x-4 overflow-x-auto -mx-6 px-6">
-              {attachments.map((attachment: any) => (
-                <FileItem key={attachment.id} attachment={attachment} />
+        {attachments.length > 0 && (
+          <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <File className="mr-2 text-blue-600" /> Arquivos do Projeto
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {attachments.map((attachment: any, index: number) => (
+                <FileItem key={index} attachment={attachment} />
               ))}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Team Members Section */}
+        <div className="bg-white rounded-xl shadow-md p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center">
+            <UsersIcon className="mr-2 text-blue-600" /> Equipe do Projeto
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {project.managers.map((managerId) => {
+              const manager = users[managerId];
+              return (
+                <div key={managerId} className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <img
+                    src={manager?.profileImage || getDefaultProfileImage(manager?.name)}
+                    alt={manager?.name || 'Unknown Manager'}
+                    className="w-10 h-10 rounded-full mr-3 object-cover"
+                  />
+                  <div>
+                    <p className="font-medium text-gray-800">{manager?.name || 'Unknown Manager'}</p>
+                    <p className="text-xs text-gray-500">Gestor</p>
+                  </div>
+                </div>
+              );
+            })}
+            {/* Display team members who are assigned to tasks but aren't managers */}
+            {tasks.map(task => task.assignedTo).filter((userId, index, self) => 
+              userId && !project.managers.includes(userId) && self.indexOf(userId) === index
+            ).map(userId => {
+              const user = users[userId];
+              return (
+                <div key={userId} className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <img
+                    src={user?.profileImage || getDefaultProfileImage(user?.name)}
+                    alt={user?.name || 'Unknown User'}
+                    className="w-10 h-10 rounded-full mr-3 object-cover"
+                  />
+                  <div>
+                    <p className="font-medium text-gray-800">{user?.name || 'Unknown User'}</p>
+                    <p className="text-xs text-gray-500">Membro</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </Layout>

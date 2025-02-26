@@ -259,24 +259,44 @@ async fetchTasks(options?: {
   }
 
   // Upload de anexos para tarefa
-  async uploadTaskAttachment(taskId: string, file: File): Promise<string> {
-    try {
-      const storageRef = ref(storage, `tasks/${taskId}/attachments/${file.name}`)
-      await uploadBytes(storageRef, file)
-      const downloadURL = await getDownloadURL(storageRef)
+async uploadTaskAttachment(taskId: string, file: File): Promise<string> {
+  try {
+    // Create a unique filename to avoid collisions
+    const timestamp = Date.now();
+    const uniqueFilename = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    
+    // Create a reference to the file location in Firebase Storage
+    const storageRef = ref(storage, `tasks/${taskId}/attachments/${uniqueFilename}`);
+    
+    // Upload the file
+    const uploadResult = await uploadBytes(storageRef, file);
+    console.log('File uploaded successfully:', uploadResult);
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(storageRef);
+    console.log('Download URL obtained:', downloadURL);
 
-      // Atualizar tarefa com novo anexo
-      const taskRef = doc(this.db, 'tasks', taskId)
+    // Update task with new attachment
+    const taskRef = doc(this.db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
+    
+    if (taskSnap.exists()) {
+      const taskData = taskSnap.data() as TaskSchema;
+      const attachments = taskData.attachments || [];
+      
+      // Add the new attachment URL to the array
       await updateDoc(taskRef, {
-        attachments: [...(await this.getTaskAttachments(taskId)), downloadURL]
-      })
-
-      return downloadURL
-    } catch (error) {
-      console.error('Erro ao fazer upload de anexo:', error)
-      throw error
+        attachments: [...attachments, downloadURL],
+        updatedAt: Date.now()
+      });
     }
+
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading attachment:', error);
+    throw new Error('Failed to upload file. Please try again.');
   }
+}
 
   // Buscar anexos de uma tarefa
   async getTaskAttachments(taskId: string): Promise<string[]> {
@@ -335,47 +355,61 @@ async fetchTasks(options?: {
   }
 
     // NEW: Complete a task action
-    async completeTaskAction(taskId: string, actionId: string, data?: any): Promise<void> {
-        try {
-            const taskRef = doc(this.db, 'tasks', taskId);
-            const taskSnap = await getDoc(taskRef);
+async completeTaskAction(taskId: string, actionId: string, data?: any): Promise<void> {
+  try {
+    const taskRef = doc(this.db, 'tasks', taskId);
+    const taskSnap = await getDoc(taskRef);
 
-            if (!taskSnap.exists()) {
-                throw new Error('Task not found');
-            }
-
-            const taskData = taskSnap.data() as TaskSchema;
-            const updatedActions = taskData.actions.map(action => {
-                if (action.id === actionId) {
-                    let updatedAction: TaskAction = {
-                        ...action,
-                        completed: true,
-                        completedAt: Date.now(),
-                        completedBy: auth.currentUser?.uid
-                    };
-
-                    // If it's an 'info' action with attachments, handle them
-                    if (action.type === 'info' && action.hasAttachments && data && data.attachments) {
-                        updatedAction = {
-                            ...updatedAction,
-                            attachments: data.attachments // Store attachment URLs
-                        };
-                    }
-                    return updatedAction;
-
-                }
-                return action;
-            });
-
-            await updateDoc(taskRef, {
-                actions: updatedActions,
-                updatedAt: Date.now()
-            });
-        } catch (error) {
-            console.error('Error completing task action:', error);
-            throw error;
-        }
+    if (!taskSnap.exists()) {
+      throw new Error('Task not found');
     }
+
+    const taskData = taskSnap.data() as TaskSchema;
+    const updatedActions = taskData.actions.map(action => {
+      if (action.id === actionId) {
+        let updatedAction: TaskAction = {
+          ...action,
+          completed: true,
+          completedAt: Date.now(),
+          completedBy: auth.currentUser?.uid
+        };
+
+        // If it's an 'info' action with attachments, handle them
+        if (action.type === 'info' && action.hasAttachments && data && data.attachments) {
+          updatedAction = {
+            ...updatedAction,
+            data: {
+              ...updatedAction.data,
+              fileURLs: data.attachments // Store attachment URLs
+            }
+          };
+        } else if (action.type === 'document' && data) {
+          // For document type, store the content in the data field
+          updatedAction = {
+            ...updatedAction,
+            data: {
+              ...updatedAction.data,
+              content: data
+            }
+          };
+        }
+        
+        return updatedAction;
+      }
+      return action;
+    });
+
+    await updateDoc(taskRef, {
+      actions: updatedActions,
+      updatedAt: Date.now()
+    });
+    
+    console.log('Task action completed successfully');
+  } catch (error) {
+    console.error('Error completing task action:', error);
+    throw error;
+  }
+}
 
   // NEW: Uncomplete a task action
       async uncompleteTaskAction(taskId: string, actionId: string): Promise<void> {
