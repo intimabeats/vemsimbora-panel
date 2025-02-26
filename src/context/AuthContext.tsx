@@ -15,7 +15,8 @@ import {
   onAuthStateChanged,
   User,
   getIdToken,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  updatePassword
 } from 'firebase/auth'
 import { getDoc, doc } from 'firebase/firestore'
 import { db } from '../config/firebase'
@@ -27,6 +28,7 @@ type UserRole = 'admin' | 'manager' | 'employee'
 interface ExtendedUser extends User {
   role?: UserRole
   coins?: number
+  bio?: string
 }
 
 // Auth context type
@@ -41,6 +43,7 @@ type AuthContextType = {
     employee: boolean
   }>
   resetPassword: (email: string) => Promise<void>
+  updateUserPassword: (newPassword: string) => Promise<void>
   setCurrentUser: React.Dispatch<React.SetStateAction<ExtendedUser | null>>
 }
 
@@ -56,6 +59,7 @@ const AuthContext = createContext<AuthContextType>({
     employee: false
   }),
   resetPassword: async () => { },
+  updateUserPassword: async () => { },
   setCurrentUser: () => {}
 })
 
@@ -82,44 +86,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await getDoc(doc(db, 'users', user.uid))
           if (userDoc.exists()) {
             const userData = userDoc.data()
-            setCurrentUser({
+            const extendedUser: ExtendedUser = {
               ...user,
               role: userData.role,
-              coins: userData.coins
-            })
+              coins: userData.coins,
+              bio: userData.bio
+            }
+            setCurrentUser(extendedUser)
             
             // Update localStorage with fresh data
             localStorage.setItem('user', JSON.stringify({
               role: userData.role,
-              coins: userData.coins
+              coins: userData.coins,
+              bio: userData.bio
             }))
           } else {
             // If user document doesn't exist in Firestore, use stored data
-            setCurrentUser({
+            const extendedUser: ExtendedUser = {
               ...user,
               role: parsedUser.role,
-              coins: parsedUser.coins
-            })
+              coins: parsedUser.coins,
+              bio: parsedUser.bio
+            }
+            setCurrentUser(extendedUser)
           }
         } else {
           // If no data in localStorage, fetch from Firestore
           const userDoc = await getDoc(doc(db, 'users', user.uid))
           if (userDoc.exists()) {
             const userData = userDoc.data()
-            setCurrentUser({
+            const extendedUser: ExtendedUser = {
               ...user,
               role: userData.role,
-              coins: userData.coins
-            })
+              coins: userData.coins,
+              bio: userData.bio
+            }
+            setCurrentUser(extendedUser)
             
             // Save to localStorage
             localStorage.setItem('user', JSON.stringify({
               role: userData.role,
-              coins: userData.coins
+              coins: userData.coins,
+              bio: userData.bio
             }))
           } else {
             // If no user document found, set user without role/coins
-            setCurrentUser(user)
+            setCurrentUser(user as ExtendedUser)
           }
         }
       } catch (error) {
@@ -162,10 +174,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [updateUser])
 
   // Authentication methods
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<ExtendedUser> => {
     try {
       const user = await AuthService.login(email, password)
       console.log("AuthContext login - user after AuthService.login:", user);
+
+      // Create an ExtendedUser object
+      const extendedUser: ExtendedUser = {
+        ...user,
+        role: user.role,
+        coins: user.coins
+      }
 
       // Save data to localStorage
       localStorage.setItem('user', JSON.stringify({
@@ -173,8 +192,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         coins: user.coins
       }))
 
-      setCurrentUser(user)
-      return user
+      setCurrentUser(extendedUser)
+      return extendedUser
     } catch (error) {
       console.error('Login error:', error)
       throw error
@@ -216,14 +235,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Add a new method to update password
+  const updateUserPassword = async (newPassword: string) => {
+    try {
+      if (!currentUser) {
+        throw new Error('No authenticated user');
+      }
+      
+      await updatePassword(currentUser, newPassword);
+    } catch (error) {
+      console.error("Error updating password:", error);
+      throw error;
+    }
+  };
+
   // Context value
-  const value = {
+  const value: AuthContextType = {
     currentUser,
     login,
     logout,
     refreshToken,
     checkTokenClaims,
     resetPassword,
+    updateUserPassword,
     setCurrentUser
   }
 
