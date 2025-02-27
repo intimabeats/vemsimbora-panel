@@ -27,7 +27,6 @@ import { userManagementService } from '../../services/UserManagementService'
 import { useAuth } from '../../context/AuthContext'
 import { ProjectSchema, TaskSchema } from '../../types/firestore-schema'
 import { getDefaultProfileImage } from '../../utils/user'
-import { Link } from 'react-router-dom'
 
 // FileItem Component
 const FileItem: React.FC<{
