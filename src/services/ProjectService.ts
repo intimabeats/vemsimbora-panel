@@ -253,19 +253,15 @@ async fetchProjects(options?: {
   page?: number;
 }) {
   try {
-    console.log("Fetching projects with options:", options);
-    
     // Create a base query
     let q = query(collection(this.db, 'projects'));
     
-    // Apply status filter if provided and not empty
+    // Apply status filter if provided and not empty string
     if (options?.status && options.status !== '') {
-      console.log("Applying status filter:", options.status);
       q = query(q, where('status', '==', options.status));
     } 
     // Apply excludeStatus filter if no status filter is provided or it's empty
     else if (options?.excludeStatus) {
-      console.log("Applying exclude status filter:", options.excludeStatus);
       q = query(q, where('status', '!=', options.excludeStatus));
     }
 
@@ -273,9 +269,7 @@ async fetchProjects(options?: {
     q = query(q, orderBy('createdAt', 'desc'));
 
     // Execute query
-    console.log("Executing query...");
     const snapshot = await getDocs(q);
-    console.log(`Query returned ${snapshot.docs.length} documents`);
     
     const allProjects = snapshot.docs.map(doc => ({
       id: doc.id,
