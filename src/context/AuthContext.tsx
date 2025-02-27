@@ -16,9 +16,11 @@ import {
   User,
   getIdToken,
   sendPasswordResetEmail,
-  updatePassword
+  updatePassword,
+  createUserWithEmailAndPassword,
+  updateProfile
 } from 'firebase/auth'
-import { getDoc, doc } from 'firebase/firestore'
+import { getDoc, doc, setDoc } from 'firebase/firestore'
 import { db } from '../config/firebase'
 
 // User roles type
@@ -45,6 +47,7 @@ type AuthContextType = {
   resetPassword: (email: string) => Promise<void>
   updateUserPassword: (newPassword: string) => Promise<void>
   setCurrentUser: React.Dispatch<React.SetStateAction<ExtendedUser | null>>
+  register: (name: string, email: string, password: string, role: UserRole) => Promise<ExtendedUser>
 }
 
 // Create context
@@ -60,7 +63,8 @@ const AuthContext = createContext<AuthContextType>({
   }),
   resetPassword: async () => { },
   updateUserPassword: async () => { },
-  setCurrentUser: () => {}
+  setCurrentUser: () => {},
+  register: async () => ({} as ExtendedUser)
 })
 
 // Auth provider component
@@ -252,6 +256,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Add register method
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    role: UserRole
+  ): Promise<ExtendedUser> => {
+    try {
+      // Create user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Update profile
+      await updateProfile(user, { displayName: name });
+
+      // Create document in Firestore
+      const userData = {
+        id: user.uid,
+        name,
+        email,
+        role,
+        coins: 0,
+        status: 'active',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+
+      await setDoc(doc(db, 'users', user.uid), userData);
+
+      // Create extended user
+      const extendedUser = {
+        ...user,
+        role,
+        coins: 0
+      } as ExtendedUser;
+
+      // Save to localStorage
+      localStorage.setItem('user', JSON.stringify({
+        role,
+        coins: 0
+      }));
+
+      setCurrentUser(extendedUser);
+      return extendedUser;
+    } catch (error) {
+      console.error('Registration error:', error);
+      throw error;
+    }
+  };
+
   // Context value
   const value: AuthContextType = {
     currentUser,
@@ -261,7 +315,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkTokenClaims,
     resetPassword,
     updateUserPassword,
-    setCurrentUser
+    setCurrentUser,
+    register
   }
 
   return (
