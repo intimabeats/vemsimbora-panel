@@ -247,36 +247,42 @@ async addSystemMessageToProjectChat(
 
  // Buscar projetos com paginação e filtros
 async fetchProjects(options?: {
-  status?: ProjectSchema['status'];
-  excludeStatus?: ProjectSchema['status']; // Add excludeStatus
+  status?: ProjectSchema['status'] | '';
+  excludeStatus?: ProjectSchema['status'];
   limit?: number;
   page?: number;
 }) {
   try {
+    console.log("Fetching projects with options:", options);
+    
+    // Create a base query
     let q = query(collection(this.db, 'projects'));
-
-    // Filtros
-    if (options?.status) {
-      q = query(q, where('status', '==', options.status)); // Apply status filter
+    
+    // Apply status filter if provided and not empty
+    if (options?.status && options.status !== '') {
+      console.log("Applying status filter:", options.status);
+      q = query(q, where('status', '==', options.status));
+    } 
+    // Apply excludeStatus filter if no status filter is provided or it's empty
+    else if (options?.excludeStatus) {
+      console.log("Applying exclude status filter:", options.excludeStatus);
+      q = query(q, where('status', '!=', options.excludeStatus));
     }
 
-    // Exclude status (for "Todos os Status" to exclude "archived")
-    if (options?.excludeStatus) {
-      q = query(q, where('status', '!=', options.excludeStatus)); // Apply excludeStatus filter
-    }
-    // Apply BOTH filters if BOTH are present.  Previous code only applied one.
-
-    // Ordenação
+    // Apply ordering
     q = query(q, orderBy('createdAt', 'desc'));
 
-    // Executar consulta
+    // Execute query
+    console.log("Executing query...");
     const snapshot = await getDocs(q);
+    console.log(`Query returned ${snapshot.docs.length} documents`);
+    
     const allProjects = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as ProjectSchema));
 
-    // Paginação
+    // Pagination
     const limit = options?.limit || 10;
     const page = options?.page || 1;
     const startIndex = (page - 1) * limit;

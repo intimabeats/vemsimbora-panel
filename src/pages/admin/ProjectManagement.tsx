@@ -8,7 +8,10 @@ import {
   ChevronRight,
   Search,
   Archive,
-  FolderOpen
+  FolderOpen,
+  Calendar,
+  Users,
+  Filter
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ProjectSchema } from '../../types/firestore-schema'
@@ -16,16 +19,16 @@ import { projectService } from '../../services/ProjectService'
 import { CreateProjectModal } from '../../components/modals/CreateProjectModal'
 import { EditProjectModal } from '../../components/modals/EditProjectModal'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
-import useDebounce from '../../utils/useDebounce'; // Import the debounce hook
+import useDebounce from '../../utils/useDebounce'
 
 export const ProjectManagement: React.FC = () => {
   const [projects, setProjects] = useState<ProjectSchema[]>([])
   const [isLoading, setLoading] = useState(true)
   const [filter, setFilter] = useState<{
-    status?: ProjectSchema['status']
-  }>({})
+    status?: ProjectSchema['status'] | ''
+  }>({ status: '' })
   const [searchTerm, setSearchTerm] = useState('')
-  const debouncedSearchTerm = useDebounce(searchTerm, 500); // Debounce the search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(1)
@@ -37,42 +40,46 @@ export const ProjectManagement: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<ProjectSchema | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-    // useCallback to prevent unnecessary re-renders of fetchProjects
-    const fetchProjects = useCallback(async () => {
-        try {
-            setLoading(true);
-            const options: {
-                status?: ProjectSchema['status'];
-                excludeStatus?: ProjectSchema['status'];
-                limit: number;
-                page: number;
-            } = {
-                limit: itemsPerPage,
-                page: currentPage,
-            };
+  // useCallback to prevent unnecessary re-renders of fetchProjects
+  const fetchProjects = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const options: {
+        status?: ProjectSchema['status'];
+        excludeStatus?: ProjectSchema['status'];
+        limit: number;
+        page: number;
+      } = {
+        limit: itemsPerPage,
+        page: currentPage,
+      };
 
-            if (filter.status) {
-                options.status = filter.status;
-            } else {
-                options.excludeStatus = 'archived'; // Exclude archived by default
-            }
+      // Only set status filter if it's not empty
+      if (filter.status && filter.status !== '') {
+        options.status = filter.status as ProjectSchema['status'];
+      } else {
+        // Only exclude archived when no specific status is selected
+        options.excludeStatus = 'archived';
+      }
 
-            const fetchedProjects = await projectService.fetchProjects(options);
-            setProjects(fetchedProjects.data);
-            setTotalPages(fetchedProjects.totalPages);
-
-        } catch (error) {
-            console.error('Erro ao buscar projetos:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [filter.status, currentPage, itemsPerPage]); // Correct dependencies
+      const fetchedProjects = await projectService.fetchProjects(options);
+      setProjects(fetchedProjects.data);
+      setTotalPages(fetchedProjects.totalPages);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setError('Failed to load projects. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [filter.status, currentPage, itemsPerPage]);
 
   useEffect(() => {
     fetchProjects()
-  }, [filter, currentPage, debouncedSearchTerm, fetchProjects]); // Use debouncedSearchTerm
-
+  }, [filter, currentPage, debouncedSearchTerm, fetchProjects]);
 
   const handleDeleteProject = async () => {
     if (!selectedProject) return
@@ -85,7 +92,8 @@ export const ProjectManagement: React.FC = () => {
       setSelectedProject(null)
       setIsDeleteModalOpen(false)
     } catch (error) {
-      console.error('Erro ao excluir projeto:', error)
+      console.error('Error deleting project:', error)
+      setError('Failed to delete project. Please try again.')
     }
   }
 
@@ -118,6 +126,7 @@ export const ProjectManagement: React.FC = () => {
       fetchProjects();
     } catch (error) {
       console.error('Error archiving project:', error);
+      setError('Failed to archive project. Please try again.');
     }
   };
 
@@ -128,19 +137,18 @@ export const ProjectManagement: React.FC = () => {
       fetchProjects();
     } catch (error) {
       console.error('Error unarchiving project:', error);
+      setError('Failed to unarchive project. Please try again.');
     }
   };
 
-
-
   const StatusBadge: React.FC<{ status: ProjectSchema['status'] }> = ({ status }) => {
     const statusStyles = {
-      planning: 'bg-yellow-100 text-yellow-800',
-      active: 'bg-green-100 text-green-800',
-      completed: 'bg-blue-100 text-blue-800',
-      paused: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800',
-      archived: 'bg-gray-400 text-white' // Style for archived status
+      planning: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+      active: 'bg-green-100 text-green-800 border border-green-200',
+      completed: 'bg-blue-100 text-blue-800 border border-blue-200',
+      paused: 'bg-gray-100 text-gray-800 border border-gray-200',
+      cancelled: 'bg-red-100 text-red-800 border border-red-200',
+      archived: 'bg-gray-400 text-white border border-gray-500'
     }
 
     const statusLabels = {
@@ -149,156 +157,233 @@ export const ProjectManagement: React.FC = () => {
       completed: 'Concluído',
       paused: 'Pausado',
       cancelled: 'Cancelado',
-      archived: 'Arquivado' // Label for archived status
+      archived: 'Arquivado'
     }
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs ${statusStyles[status]}`}>
+      <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusStyles[status]}`}>
         {statusLabels[status]}
       </span>
     )
   }
 
+  const getProjectProgress = (project: ProjectSchema): number => {
+    // This is a placeholder. In a real app, you would calculate this based on completed tasks
+    const progressMap: Record<ProjectSchema['status'], number> = {
+      planning: 10,
+      active: 50,
+      completed: 100,
+      paused: 70,
+      cancelled: 30,
+      archived: 100
+    };
+    
+    return progressMap[project.status] || 0;
+  };
+
+  const filteredProjects = projects.filter((project) =>
+    project.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+    project.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+  );
+
   return (
     <Layout role="admin" isLoading={isLoading}>
       <div className="container mx-auto p-6">
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
-          <div>
+          {/* Header with Title and Create Button */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
                 Gerenciamento de Projetos
               </h1>
-              <p className="text-gray-500 text-sm">
-                Gerencie e acompanhe todos os projetos do sistema.
+              <p className="text-gray-500 text-sm mt-1">
+                Gerencie e acompanhe todos os projetos do sistema
               </p>
             </div>
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-blue-700 transition shadow-sm"
             >
-              <Plus className="mr-2" /> Adicionar Projeto
+              <Plus className="mr-2" size={18} /> Adicionar Projeto
             </button>
           </div>
 
-          {/* Filtros - Responsive Layout */}
-          <div className="md:flex md:space-x-4 mb-6">
-            <div className="relative flex-grow mb-4 md:mb-0">
-              <input
-                type="text"
-                placeholder="Buscar projetos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Search className="absolute left-3 top-3 text-gray-400" size={20} />
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md shadow-sm">
+              <p className="flex items-center">
+                <span className="mr-2">⚠️</span> {error}
+              </p>
             </div>
+          )}
 
-            <select
-              value={filter.status || ''}
-              onChange={(e) => setFilter({ ...filter, status: e.target.value as ProjectSchema['status'] })}
-              className="w-full md:w-auto px-4 py-2 border rounded-lg"
-            >
-              <option value="">Todos os Status</option>
-              <option value="planning">Planejamento</option>
-              <option value="active">Ativos</option>
-              <option value="completed">Concluídos</option>
-              <option value="paused">Pausados</option>
-              <option value="cancelled">Cancelados</option>
-              <option value="archived">Arquivados</option>
-            </select>
+          {/* Filters Section */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Search Input */}
+              <div className="relative flex-grow">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="text-gray-400" size={18} />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar projetos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Filter className="text-gray-400" size={18} />
+                </div>
+                <select
+                  value={filter.status}
+                  onChange={(e) => setFilter({ status: e.target.value })}
+                  className="pl-10 pr-8 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 appearance-none"
+                >
+                  <option value="">Todos os Status</option>
+                  <option value="planning">Planejamento</option>
+                  <option value="active">Ativos</option>
+                  <option value="completed">Concluídos</option>
+                  <option value="paused">Pausados</option>
+                  <option value="cancelled">Cancelados</option>
+                  <option value="archived">Arquivados</option>
+                </select>
+              </div>
+            </div>
           </div>
 
-          {/* Project Cards (Grid Layout) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.length === 0 ? (
-              <div className="text-center py-4 col-span-full">
-                Nenhum projeto encontrado
+          {/* Project Cards Grid */}
+          {filteredProjects.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-8 text-center border border-gray-100">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Briefcase className="text-gray-400" size={24} />
               </div>
-            ) : (
-              projects
-              .filter((project) =>
-                project.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||  // Use debouncedSearchTerm
-                project.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
-              )
-              .map((project) => (
-                <div key={project.id} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition group">
-                  <div className="flex justify-between items-start mb-4">
-                    <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition">
-                      <Link to={`/admin/projects/${project.id}`}>{project.name}</Link>
-                    </h2>
-                    <div className="flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {project.status === 'archived' ? (
+              <h3 className="text-lg font-medium text-gray-800 mb-2">Nenhum projeto encontrado</h3>
+              <p className="text-gray-500 mb-4">
+                {searchTerm || filter.status
+                  ? 'Tente ajustar os filtros para encontrar o que está procurando.'
+                  : 'Comece criando seu primeiro projeto.'}
+              </p>
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition inline-flex items-center"
+              >
+                <Plus size={18} className="mr-2" /> Criar Projeto
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredProjects.map((project) => (
+                <div 
+                  key={project.id} 
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition group"
+                >
+                  {/* Project Header */}
+                  <div className="p-6 border-b border-gray-100">
+                    <div className="flex justify-between items-start mb-3">
+                      <h2 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition line-clamp-1">
+                        <Link to={`/admin/projects/${project.id}`}>{project.name}</Link>
+                      </h2>
+                      <StatusBadge status={project.status} />
+                    </div>
+                    <p className="text-gray-600 mb-4 line-clamp-2 text-sm">{project.description}</p>
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${getProjectProgress(project)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <span className="text-xs text-gray-500">{getProjectProgress(project)}% Completo</span>
+                    </div>
+                  </div>
+                  
+                  {/* Project Details */}
+                  <div className="px-6 py-4 bg-gray-50">
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Calendar size={16} className="mr-2 text-gray-500" />
+                        <span>
+                          {new Date(project.startDate).toLocaleDateString()}
+                          {project.endDate && ` - ${new Date(project.endDate).toLocaleDateString()}`}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600">
+                        <Users size={16} className="mr-2 text-gray-500" />
+                        <span>{project.managers.length} Gestores</span>
+                      </div>
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex justify-end space-x-2 mt-2">
+                      {project.status === 'archived' ? (
                         <button
                           onClick={() => handleUnarchiveProject(project.id)}
-                          className="text-green-500 hover:text-green-700"
+                          className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors"
                           title="Desarquivar"
                         >
-                          <FolderOpen size={20} />
+                          <FolderOpen size={18} />
                         </button>
                       ) : (
                         <button
                           onClick={() => handleArchiveProject(project.id)}
-                          className="text-yellow-500 hover:text-yellow-700"
+                          className="p-2 text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 rounded-full transition-colors"
                           title="Arquivar"
                         >
-                          <Archive size={20} />
+                          <Archive size={18} />
                         </button>
                       )}
                       <button
                         onClick={() => handleEditProject(project)}
-                        className="text-blue-500 hover:text-blue-700"
+                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                        title="Editar"
                       >
-                        <Edit size={20} />
+                        <Edit size={18} />
                       </button>
                       <button
                         onClick={() => handleDeleteConfirmation(project)}
-                        className="text-red-500 hover:text-red-700"
+                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                        title="Excluir"
                       >
-                        <Trash2 size={20} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </div>
-                  <p className="text-gray-600 mb-4 line-clamp-2">{project.description}</p>
-                  <div className="text-sm text-gray-600 mb-2">
-                    Início: {new Date(project.startDate).toLocaleDateString()}
-                    {project.endDate && (
-                      <>
-                        <br />
-                        Fim: {new Date(project.endDate).toLocaleDateString()}
-                      </>
-                    )}
-                  </div>
-                   {/* Status Badge - Bottom Right */}
-                  <div className="flex justify-end">
-                    <StatusBadge status={project.status} />
-                  </div>
                 </div>
-              ))
-            )}
-          </div>
-
-          {/* Paginação */}
-          <div className="flex justify-between items-center mt-4">
-            <span className="text-sm text-gray-600">
-              Página {currentPage} de {totalPages}
-            </span>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 border rounded-lg disabled:opacity-50 flex items-center"
-              >
-                <ChevronLeft className="mr-2" /> Anterior
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 border rounded-lg disabled:opacity-50 flex items-center"
-              >
-                Próximo <ChevronRight className="ml-2" />
-              </button>
+              ))}
             </div>
-          </div>
+          )}
+
+          {/* Pagination */}
+          {filteredProjects.length > 0 && (
+            <div className="flex justify-between items-center mt-6 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+              <span className="text-sm text-gray-600">
+                Página {currentPage} de {totalPages}
+              </span>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center hover:bg-gray-50 transition"
+                >
+                  <ChevronLeft className="mr-2" size={16} /> Anterior
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center hover:bg-gray-50 transition"
+                >
+                  Próximo <ChevronRight className="ml-2" size={16} />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Modais */}
           <CreateProjectModal
@@ -330,5 +415,26 @@ export const ProjectManagement: React.FC = () => {
     </Layout>
   )
 }
+
+// Add missing Briefcase icon
+const Briefcase = ({ className, size }: { className?: string, size?: number }) => {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width={size || 24} 
+      height={size || 24} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <rect width="20" height="14" x="2" y="7" rx="2" ry="2"></rect>
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+    </svg>
+  );
+};
 
 export default ProjectManagement
