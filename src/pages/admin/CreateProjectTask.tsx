@@ -7,7 +7,9 @@ import {
   AlertTriangle,
   Plus,
   ArrowLeft,
-  Info
+  Info,
+  Trash2,
+  File
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -139,8 +141,9 @@ export const CreateProjectTask: React.FC = () => {
     let newAction: Partial<TaskAction> = {
       id: Date.now().toString() + Math.random().toString(36).substring(7), // Unique ID
       type: type,
-      title: '', // Default title
+      title: type === 'info' ? 'Informações Importantes' : 'Nova Ação',
       completed: false,
+      description: '',
     };
 
     // If it's an 'info' type, add the specific fields
@@ -179,6 +182,20 @@ export const CreateProjectTask: React.FC = () => {
     }));
   };
 
+  const handleRemoveAction = (actionId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      actions: prev.actions.filter(action => action.id !== actionId)
+    }));
+    
+    // Also remove any attachments for this action
+    setAttachments(prev => {
+      const newAttachments = { ...prev };
+      delete newAttachments[actionId];
+      return newAttachments;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -214,15 +231,20 @@ export const CreateProjectTask: React.FC = () => {
         }
       }
 
-      // Prepare the task data
-      const taskData = {
-        ...formData,
-        status: 'pending',
+      // Prepare the task data with proper typing
+      const taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'> = {
+        title: formData.title,
+        description: formData.description,
+        projectId: formData.projectId,
+        assignedTo: formData.assignedTo,
+        priority: formData.priority,
         startDate: new Date(formData.startDate).getTime(),
         dueDate: new Date(formData.dueDate).getTime(),
+        status: 'pending',
+        difficultyLevel: formData.difficultyLevel,
         coinsReward,
         actions: actionsWithAttachments,
-        createdBy: '', // This will be set by the service
+        createdBy: currentUser?.uid || '',
         subtasks: [],
         comments: [],
         attachments: []
@@ -241,7 +263,7 @@ export const CreateProjectTask: React.FC = () => {
   };
 
   return (
-    <Layout role="admin">
+    <Layout role={currentUser?.role || 'admin'}>
       <div className="container mx-auto p-6">
         <div className="flex justify-between items-center mb-6">
           <button onClick={() => navigate(-1)} className="text-gray-600 hover:text-blue-600">
@@ -415,22 +437,11 @@ export const CreateProjectTask: React.FC = () => {
                     <span className="font-medium text-gray-900">{action.title}</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          actions: prev.actions.filter(a => a.id !== action.id)
-                        }));
-                        // Also remove any attachments for this action
-                        setAttachments(prev => {
-                          const newAttachments = { ...prev };
-                          delete newAttachments[action.id];
-                          return newAttachments;
-                        });
-                      }}
+                      onClick={() => handleRemoveAction(action.id)}
                       className="text-red-500 hover:text-red-700"
                       title="Remover ação"
                     >
-                      <AlertTriangle size={16} />
+                      <Trash2 size={16} />
                     </button>
                   </div>
                   
@@ -476,7 +487,10 @@ export const CreateProjectTask: React.FC = () => {
                               <h4 className="font-semibold">Arquivos Carregados:</h4>
                               <ul>
                                 {attachments[action.id].map((file, index) => (
-                                  <li key={index}>{file.name}</li>
+                                  <li key={index} className="flex items-center">
+                                    <File size={16} className="mr-1" />
+                                    {file.name}
+                                  </li>
                                 ))}
                               </ul>
                             </div>

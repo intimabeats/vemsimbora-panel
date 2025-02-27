@@ -1,6 +1,6 @@
 // src/pages/admin/ProjectDetails.tsx
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
 import {
   BarChart2,
@@ -182,7 +182,13 @@ export const ProjectDetails: React.FC = () =>
   };
 
   if (isLoading) {
-    return <Layout role="admin" isLoading={true} />
+    return (
+      <Layout role="admin" isLoading={true}>
+        <div className="flex items-center justify-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
   }
 
   if (error) {
@@ -334,7 +340,7 @@ export const ProjectDetails: React.FC = () =>
                   return (
                     <div key={managerId} className="relative w-8 h-8 rounded-full overflow-hidden mr-2 group">
                       <img
-                        src={manager?.profileImage || getDefaultProfileImage(manager?.name)}
+                        src={manager?.profileImage || getDefaultProfileImage(manager?.name || null)}
                         alt={manager?.name || 'Unknown Manager'}
                         className='object-cover w-full h-full'
                       />

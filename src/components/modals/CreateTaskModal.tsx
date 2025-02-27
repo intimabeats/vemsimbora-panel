@@ -118,7 +118,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     if (!formData.projectId) errors.projectId = 'Projeto é obrigatório';
     if (!formData.assignedTo) errors.assignedTo = 'Um responsável é obrigatório'; // Validate single assignee
     if (!formData.startDate) errors.startDate = 'Data de início é obrigatória'; // Validate start date
-    if (!formData.dueDate) errors.dueDate = 'Data de vencimento é obrigatória';
+    if (!formData.dueDate) errors.dueDate = "Data de vencimento é obrigatória";
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -187,6 +188,36 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }));
   };
 
+  // Add a new action of specified type
+  const handleAddAction = (type: TaskAction['type']) => {
+    const newAction: TaskAction = {
+      id: Date.now().toString() + Math.random().toString(36).substring(7),
+      title: type === 'info' ? 'Informações Importantes' : 'Nova Ação',
+      type,
+      completed: false,
+      description: '',
+      infoTitle: type === 'info' ? '' : undefined,
+      infoDescription: type === 'info' ? '' : undefined,
+      hasAttachments: type === 'info' ? false : undefined,
+      data: {}
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      actions: [...prev.actions, newAction]
+    }));
+  };
+
+  // Handle changes to action properties
+  const handleActionChange = (actionId: string, field: keyof TaskAction, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      actions: prev.actions.map(action => 
+        action.id === actionId ? { ...action, [field]: value } : action
+      )
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -222,18 +253,25 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         }
       }
 
-      const newTask = await taskService.createTask({
-        ...formData,
-        status: 'pending',
-        startDate: new Date(formData.startDate).getTime(), // Convert start date
+      const taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'> = {
+        title: formData.title,
+        description: formData.description,
+        projectId: formData.projectId,
+        assignedTo: formData.assignedTo,
+        priority: formData.priority,
+        startDate: new Date(formData.startDate).getTime(),
         dueDate: new Date(formData.dueDate).getTime(),
         coinsReward,
         actions: actionsWithAttachments,
         createdBy: '', // This will be set by the service
+        status: 'pending',
         subtasks: [],
         comments: [],
-        attachments: []
-      });
+        attachments: [],
+        difficultyLevel: formData.difficultyLevel
+      };
+
+      const newTask = await taskService.createTask(taskData);
 
       onTaskCreated(newTask);
       onClose();
