@@ -5,10 +5,10 @@ import {
   X,
   AlertTriangle,
   Plus,
-    Info, // Import the Info icon
-    File, //NEW
-    Download, //NEW
-    Trash2
+  Info, // Import the Info icon
+  File, //NEW
+  Download, //NEW
+  Trash2
 } from 'lucide-react'
 import { taskService } from '../../services/TaskService'
 import { projectService } from '../../services/ProjectService'
@@ -53,32 +53,32 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [templates, setTemplates] = useState<{ id: string, title: string }[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [selectedProjectName, setSelectedProjectName] = useState('');
-    //NEW
-    const [attachments, setAttachments] = useState<{ [actionId: string]: File[] }>({});
+  // Store file attachments for each action
+  const [attachments, setAttachments] = useState<{ [actionId: string]: File[] }>({});
 
 
-    useEffect(() => {
-        if (!isOpen) {
-            setFormData({
-                title: '',
-                description: '',
-                projectId: projectId || '',
-                assignedTo: '', // Reset to empty string
-                priority: 'medium',
-                startDate: new Date().toISOString().split('T')[0], // Reset start date
-                dueDate: new Date().toISOString().split('T')[0],
-                difficultyLevel: 5,
-                actions: []
-            });
-            setError(null);
-            setFormErrors({});
-            setSelectedTemplate('');
-            setSelectedProjectName('');
-            setAttachments({}); // Reset attachments
-        } else {
-            setFormData(prev => ({ ...prev, projectId: projectId || '' }));
-        }
-    }, [isOpen, projectId]);
+  useEffect(() => {
+    if (!isOpen) {
+      setFormData({
+        title: '',
+        description: '',
+        projectId: projectId || '',
+        assignedTo: '', // Reset to empty string
+        priority: 'medium',
+        startDate: new Date().toISOString().split('T')[0], // Reset start date
+        dueDate: new Date().toISOString().split('T')[0],
+        difficultyLevel: 5,
+        actions: []
+      });
+      setError(null);
+      setFormErrors({});
+      setSelectedTemplate('');
+      setSelectedProjectName('');
+      setAttachments({}); // Reset attachments
+    } else {
+      setFormData(prev => ({ ...prev, projectId: projectId || '' }));
+    }
+  }, [isOpen, projectId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -125,10 +125,10 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
-        setFormData(prev => ({
-            ...prev,
-            [name]: value
-        }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
     if (formErrors[name]) {
       setFormErrors(prev => {
         const newErrors = { ...prev }
@@ -164,21 +164,28 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     }
   };
 
-    const handleRemoveAction = (actionId: string) => {
-        setFormData(prev => ({
-            ...prev,
-            actions: prev.actions.filter(action => action.id !== actionId)
-        }));
-    };
+  const handleRemoveAction = (actionId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      actions: prev.actions.filter(action => action.id !== actionId)
+    }));
+    
+    // Also remove any attachments for this action
+    setAttachments(prev => {
+      const newAttachments = { ...prev };
+      delete newAttachments[actionId];
+      return newAttachments;
+    });
+  };
 
-    // NEW: Handle file uploads
-    const handleFileUpload = (actionId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(event.target.files || []);
-        setAttachments(prev => ({
-            ...prev,
-            [actionId]: files
-        }));
-    };
+  // Handle file uploads
+  const handleFileUpload = (actionId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    setAttachments(prev => ({
+      ...prev,
+      [actionId]: files
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,12 +195,44 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     setError(null);
 
     try {
+      // Process any file uploads for info-type actions
+      const actionsWithAttachments = [...formData.actions];
+      
+      for (let i = 0; i < actionsWithAttachments.length; i++) {
+        const action = actionsWithAttachments[i];
+        if (action.type === 'info' && action.hasAttachments && attachments[action.id]) {
+          // Create a temporary ID for file uploads before task creation
+          const tempTaskId = 'temp_' + Date.now().toString();
+          
+          // Upload files for this action
+          const uploadPromises = attachments[action.id].map(file => 
+            taskService.uploadTaskAttachment(tempTaskId, file)
+          );
+          
+          const fileUrls = await Promise.all(uploadPromises);
+          
+          // Update the action with file URLs
+          actionsWithAttachments[i] = {
+            ...action,
+            data: {
+              ...action.data,
+              fileURLs: fileUrls
+            }
+          };
+        }
+      }
+
       const newTask = await taskService.createTask({
         ...formData,
         status: 'pending',
         startDate: new Date(formData.startDate).getTime(), // Convert start date
         dueDate: new Date(formData.dueDate).getTime(),
-        coinsReward
+        coinsReward,
+        actions: actionsWithAttachments,
+        createdBy: '', // This will be set by the service
+        subtasks: [],
+        comments: [],
+        attachments: []
       });
 
       onTaskCreated(newTask);
@@ -291,7 +330,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             {formErrors.projectId && (
                 <p className="text-red-500 text-xs mt-1">{formErrors.projectId}</p>
             )}
-            </div>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -408,52 +447,87 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </label>
             <div className="space-y-2">
             {formData.actions.map((action) => (
-                <div key={action.id} className="border rounded-lg p-4 flex items-center justify-between">
-                    <div>
+                <div key={action.id} className="border rounded-lg p-4 flex flex-col">
+                    <div className="flex justify-between items-center mb-2">
                         <span className="font-medium text-gray-900">{action.title}</span>
-                        {/* NEW: Display infoTitle if it's an 'info' type */}
-                        {action.type === 'info' && action.infoTitle && (
-                            <span className="block text-sm text-gray-600">{action.infoTitle}</span>
-                        )}
-
+                        <button
+                            type="button"
+                            onClick={() => handleRemoveAction(action.id)}
+                            className="text-red-500 hover:text-red-700"
+                            title="Remover ação"
+                        >
+                            <Trash2 size={16} />
+                        </button>
                     </div>
-                    {/* NEW: File upload for 'info' type with attachments */}
-                    {action.type === 'info' && action.hasAttachments && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {action.infoTitle} {/* Use infoTitle as label */}
-                            </label>
+                    
+                    {/* Display infoTitle if it's an 'info' type */}
+                    {action.type === 'info' && (
+                        <div className="space-y-2 mt-2">
                             <input
-                                type="file"
-                                multiple
-                                onChange={(e) => handleFileUpload(action.id, e)}
+                                type="text"
+                                value={action.infoTitle || ''}
+                                onChange={(e) => handleActionChange(action.id, 'infoTitle', e.target.value)}
+                                placeholder="Título das Informações"
                                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
                             />
-                            {/* Display uploaded files for this specific action */}
-                            {attachments[action.id] && attachments[actionId].length > 0 && (
+                            <textarea
+                                value={action.infoDescription || ''}
+                                onChange={(e) => handleActionChange(action.id, 'infoDescription', e.target.value)}
+                                placeholder="Descrição das Informações"
+                                className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                            />
+                            <label className="flex items-center">
+                                <input
+                                    type="checkbox"
+                                    checked={action.hasAttachments || false}
+                                    onChange={(e) => handleActionChange(action.id, 'hasAttachments', e.target.checked)}
+                                    className="mr-2"
+                                />
+                                Requer arquivos?
+                            </label>
+                            
+                            {/* File upload section */}
+                            {action.hasAttachments && (
                                 <div className="mt-2">
-                                    <h4 className="font-semibold">Arquivos Carregados:</h4>
-                                    <ul>
-                                        {attachments[action.id].map((file, index) => (
-                                            <li key={index}>{file.name}</li>
-                                        ))}
-                                    </ul>
+                                    <input
+                                        type="file"
+                                        multiple
+                                        onChange={(e) => handleFileUpload(action.id, e)}
+                                        className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300 text-gray-900"
+                                    />
+                                    
+                                    {/* Display uploaded files */}
+                                    {attachments[action.id] && attachments[action.id].length > 0 && (
+                                        <div className="mt-2">
+                                            <h4 className="font-semibold">Arquivos Carregados:</h4>
+                                            <ul>
+                                                {attachments[action.id].map((file, index) => (
+                                                    <li key={index} className="flex items-center">
+                                                        <File size={16} className="mr-1" />
+                                                        {file.name}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
                     )}
-                    <button
-                        type="button"
-                        onClick={() => handleRemoveAction(action.id)}
-                        className="text-red-500 hover:text-red-700"
-                        title="Remover ação"
-                    >
-                        <Trash2 size={16} />
-                    </button>
                 </div>
             ))}
             </div>
+            
+            {/* Add manual action button */}
+            <button
+                type="button"
+                onClick={() => handleAddAction('info')}
+                className="mt-2 px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 flex items-center"
+            >
+                <Plus size={16} className="mr-1" /> Adicionar Informações Importantes
+            </button>
           </div>
+          
           <button
             type="submit"
             disabled={loading}

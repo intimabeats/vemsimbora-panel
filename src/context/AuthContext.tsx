@@ -86,12 +86,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await getDoc(doc(db, 'users', user.uid))
           if (userDoc.exists()) {
             const userData = userDoc.data()
-            const extendedUser: ExtendedUser = {
+            const extendedUser = {
               ...user,
               role: userData.role,
               coins: userData.coins,
               bio: userData.bio
-            }
+            } as ExtendedUser;
+            
             setCurrentUser(extendedUser)
             
             // Update localStorage with fresh data
@@ -102,12 +103,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }))
           } else {
             // If user document doesn't exist in Firestore, use stored data
-            const extendedUser: ExtendedUser = {
+            const extendedUser = {
               ...user,
               role: parsedUser.role,
               coins: parsedUser.coins,
               bio: parsedUser.bio
-            }
+            } as ExtendedUser;
+            
             setCurrentUser(extendedUser)
           }
         } else {
@@ -115,12 +117,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await getDoc(doc(db, 'users', user.uid))
           if (userDoc.exists()) {
             const userData = userDoc.data()
-            const extendedUser: ExtendedUser = {
+            const extendedUser = {
               ...user,
               role: userData.role,
               coins: userData.coins,
               bio: userData.bio
-            }
+            } as ExtendedUser;
+            
             setCurrentUser(extendedUser)
             
             // Save to localStorage
@@ -180,11 +183,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log("AuthContext login - user after AuthService.login:", user);
 
       // Create an ExtendedUser object
-      const extendedUser: ExtendedUser = {
+      const extendedUser = {
         ...user,
         role: user.role,
         coins: user.coins
-      }
+      } as ExtendedUser;
 
       // Save data to localStorage
       localStorage.setItem('user', JSON.stringify({

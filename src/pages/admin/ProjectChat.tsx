@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
@@ -148,7 +149,7 @@ export const ProjectChat: React.FC = () => {
   const { currentUser } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const inputAreaRef = useRef<HTMLDivElement>(null);
 
@@ -416,7 +417,13 @@ export const ProjectChat: React.FC = () => {
   }, [newMessage, attachments, quotedMessage]);
 
   if (isLoading && !project) {
-    return <Layout role="admin" isLoading={true} />
+    return (
+      <Layout role="admin">
+        <div className="flex items-center justify-center h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      </Layout>
+    );
   }
 
   if (error) {
@@ -608,105 +615,104 @@ export const ProjectChat: React.FC = () => {
           )}
 
           <div className="flex items-center space-x-2">
-<div className="relative">
-  <button
-    type="button"
-    onClick={() => setShowFileTypeSelector(!showFileTypeSelector)}
-    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors"
-    title="Anexar arquivo"
-  >
-    <Paperclip size={20} />
-  </button>
-  {showFileTypeSelector && (
-    <div 
-      className="fixed transform -translate-x-1/2 bg-white rounded-lg shadow-lg border p-2 w-64 z-30"
-      style={{
-        bottom: `${inputAreaRef.current?.offsetHeight ? inputAreaRef.current.offsetHeight + 10 : 70}px`,
-        left: '50%',
-        maxWidth: 'calc(100vw - 20px)'
-      }}
-    >
-      <div className="flex justify-between items-center mb-2 pb-2 border-b">
-        <h3 className="text-sm font-medium">Tipo de Arquivo</h3>
-        <button onClick={() => setShowFileTypeSelector(false)} className="text-gray-400 hover:text-gray-600">
-          <X size={16} />
-        </button>
-      </div>
-      <div className="space-y-1">
-        {[
-          { type: 'image/*', label: 'Imagem', icon: <ImageIcon size={20} className="text-blue-500" /> },
-          { type: 'video/*', label: 'Vídeo', icon: <Video size={20} className="text-red-500" /> },
-          { type: 'audio/*', label: 'Áudio', icon: <Music size={20} className="text-purple-500" /> },
-          { type: 'application/pdf', label: 'PDF', icon: <FileText size={20} className="text-orange-500" /> },
-          { type: '*/*', label: 'Qualquer arquivo', icon: <File size={20} className="text-gray-500" /> },
-        ].map(fileType => (
-          <button 
-            key={fileType.type} 
-            onClick={() => {
-              selectFileType(fileType.type);
-              setShowFileTypeSelector(false);
-            }}
-            className="w-full flex items-center p-2 hover:bg-gray-100 rounded text-left transition-colors"
-          >
-            {fileType.icon}
-            <span className="ml-2">{fileType.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  )}
-  <input
-    ref={fileInputRef}
-    type="file"
-    multiple
-    onChange={handleFileSelect}
-    className="hidden"
-  />
-</div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowFileTypeSelector(!showFileTypeSelector)}
+                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-full transition-colors"
+                title="Anexar arquivo"
+              >
+                <Paperclip size={20} />
+              </button>
+              {showFileTypeSelector && (
+                <div 
+                  className="fixed transform -translate-x-1/2 bg-white rounded-lg shadow-lg border p-2 w-64 z-30"
+                  style={{
+                    bottom: `${inputAreaRef.current?.offsetHeight ? inputAreaRef.current.offsetHeight + 10 : 70}px`,
+                    left: '50%',
+                    maxWidth: 'calc(100vw - 20px)'
+                  }}
+                >
+                  <div className="flex justify-between items-center mb-2 pb-2 border-b">
+                    <h3 className="text-sm font-medium">Tipo de Arquivo</h3>
+                    <button onClick={() => setShowFileTypeSelector(false)} className="text-gray-400 hover:text-gray-600">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {[
+                      { type: 'image/*', label: 'Imagem', icon: <ImageIcon size={20} className="text-blue-500" /> },
+                      { type: 'video/*', label: 'Vídeo', icon: <Video size={20} className="text-red-500" /> },
+                      { type: 'audio/*', label: 'Áudio', icon: <Music size={20} className="text-purple-500" /> },
+                      { type: 'application/pdf', label: 'PDF', icon: <FileText size={20} className="text-orange-500" /> },
+                      { type: '*/*', label: 'Qualquer arquivo', icon: <File size={20} className="text-gray-500" /> },
+                    ].map(fileType => (
+                      <button 
+                        key={fileType.type} 
+                        onClick={() => {
+                          selectFileType(fileType.type);
+                          setShowFileTypeSelector(false);
+                        }}
+                        className="w-full flex items-center p-2 hover:bg-gray-100 rounded text-left transition-colors"
+                      >
+                        {fileType.icon}
+                        <span className="ml-2">{fileType.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
 
-           
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="p-2 text-gray-500 hover:text-yellow-500 hover:bg-gray-100 rounded-full transition-colors"
+                title="Inserir emoji"
+              >
+                <Smile size={20} />
+              </button>
+              {showEmojiPicker && (
+                <div 
+                  className="fixed transform -translate-x-1/2 bg-white rounded-lg shadow-lg border p-2 w-64 z-30"
+                  style={{
+                    bottom: `${inputAreaRef.current?.offsetHeight ? inputAreaRef.current.offsetHeight + 10 : 70}px`,
+                    left: '50%',
+                    maxWidth: 'calc(100vw - 20px)'
+                  }}
+                >
+                  <div className="flex justify-between items-center mb-2 pb-2 border-b">
+                    <h3 className="text-sm font-medium">Emojis</h3>
+                    <button onClick={() => setShowEmojiPicker(false)} className="text-gray-400 hover:text-gray-600">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    {['😀', '😂', '😊', '❤️', '👍', '🎉', '🔥', '⭐', '✅', '🚀', '🤔', '👏', '🙏', '💯', '🌟'].map(emoji => (
+                      <button 
+                        key={emoji} 
+                        onClick={() => {
+                          addEmoji(emoji);
+                          setShowEmojiPicker(false);
+                        }}
+                        className="text-xl hover:bg-gray-100 p-1 rounded transition-colors"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
-<div className="relative">
-  <button
-    type="button"
-    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-    className="p-2 text-gray-500 hover:text-yellow-500 hover:bg-gray-100 rounded-full transition-colors"
-    title="Inserir emoji"
-  >
-    <Smile size={20} />
-  </button>
-  {showEmojiPicker && (
-    <div 
-      className="fixed transform -translate-x-1/2 bg-white rounded-lg shadow-lg border p-2 w-64 z-30"
-      style={{
-        bottom: `${inputAreaRef.current?.offsetHeight ? inputAreaRef.current.offsetHeight + 10 : 70}px`,
-        left: '50%',
-        maxWidth: 'calc(100vw - 20px)'
-      }}
-    >
-      <div className="flex justify-between items-center mb-2 pb-2 border-b">
-        <h3 className="text-sm font-medium">Emojis</h3>
-        <button onClick={() => setShowEmojiPicker(false)} className="text-gray-400 hover:text-gray-600">
-          <X size={16} />
-        </button>
-      </div>
-      <div className="grid grid-cols-5 gap-2">
-        {['😀', '😂', '😊', '❤️', '👍', '🎉', '🔥', '⭐', '✅', '🚀', '🤔', '👏', '🙏', '💯', '🌟'].map(emoji => (
-          <button 
-            key={emoji} 
-            onClick={() => {
-              addEmoji(emoji);
-              setShowEmojiPicker(false);
-            }}
-            className="text-xl hover:bg-gray-100 p-1 rounded transition-colors"
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
-    </div>
-  )}
-</div>
 
 
             <div className="flex-1 relative">

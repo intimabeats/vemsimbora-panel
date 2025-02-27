@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Bell, CheckCircle, AlertCircle, X, Clock } from 'lucide-react'
-import { Notification } from '../types/notification'
+import { NotificationSchema } from '../types/firestore-schema'
 import { useAuth } from '../context/AuthContext'
 import { Link } from 'react-router-dom'
 
@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom'
 import { notificationService } from '../services/NotificationService'
 
 export const NotificationBell: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [notifications, setNotifications] = useState<NotificationSchema[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

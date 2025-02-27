@@ -128,7 +128,12 @@ useEffect(() => {
         ...formData,
         startDate: new Date(formData.startDate).getTime(),
         endDate: formData.endDate ? new Date(formData.endDate).getTime() : undefined,
-        managers: formData.managers
+        managers: formData.managers,
+        // Add createdBy to fix the TypeScript error
+        createdBy: '', // This will be set by the service using the current user
+        // Add empty arrays for messages and commentTabs to match the schema
+        messages: [],
+        commentTabs: []
       })
 
       onProjectCreated(newProject)
