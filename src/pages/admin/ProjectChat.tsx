@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Layout } from '../../components/Layout'
@@ -70,7 +71,7 @@ const ManagersModal: React.FC<{ managers: any[]; onClose: () => void }> = ({ man
                     className="w-10 h-10 rounded-full object-cover mr-3"
                   />
                   <div>
-                    <span className="text-gray-800 font-medium">{manager.name}</span>
+                    <span className="font-semibold text-gray-800">{manager.name}</span>
                     <p className="text-xs text-gray-500">Gestor</p>
                   </div>
                 </li>
@@ -309,16 +310,22 @@ export const ProjectChat: React.FC = () => {
         userName: currentUser!.displayName || users[currentUser!.uid]?.name || 'Usuário',
         content: newMessage,
         timestamp: Date.now(),
-        attachments: uploadedAttachments,
-        quotedMessage: quotedMessage
-          ? {
-            userName: quotedMessage.userName,
-            content: quotedMessage.content,
-            attachments: quotedMessage.attachments,
-          }
-          : undefined,
         messageType: 'general'
       };
+
+      // Only add attachments if there are any
+      if (uploadedAttachments.length > 0) {
+        newMessageObj.attachments = uploadedAttachments;
+      }
+
+      // Only add quotedMessage if there is one
+      if (quotedMessage) {
+        newMessageObj.quotedMessage = {
+          userName: quotedMessage.userName,
+          content: quotedMessage.content,
+          attachments: quotedMessage.attachments
+        };
+      }
 
       // Add the new message to Firestore
       await projectService.addProjectMessage(projectId!, newMessageObj);
@@ -428,11 +435,9 @@ export const ProjectChat: React.FC = () => {
   if (error) {
     return (
       <Layout role={currentUser?.role || 'employee'}>
-        <div className="p-6">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-            <strong className="font-bold">Erro: </strong>
-            <span className="block sm:inline">{error}</span>
-          </div>
+        <div className="p-4 bg-red-100 text-red-700 border border-red-400 rounded flex items-center">
+        <Info className="mr-2" size={20} />
+          {error}
         </div>
       </Layout>
     )
@@ -705,7 +710,7 @@ export const ProjectChat: React.FC = () => {
                         className="text-xl hover:bg-gray-100 p-1 rounded transition-colors"
                       >
                         {emoji}
-                      </button>
+</button>
                     ))}
                   </div>
                 </div>

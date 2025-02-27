@@ -124,17 +124,23 @@ useEffect(() => {
     setError(null)
 
     try {
-      const newProject = await projectService.createProject({
-        ...formData,
+      // Prepare project data with proper handling of empty endDate
+      const projectData: Omit<ProjectSchema, 'id' | 'createdAt' | 'updatedAt'> = {
+        name: formData.name,
+        description: formData.description,
         startDate: new Date(formData.startDate).getTime(),
-        endDate: formData.endDate ? new Date(formData.endDate).getTime() : undefined,
+        status: formData.status,
         managers: formData.managers,
-        // Add createdBy to fix the TypeScript error
-        createdBy: '', // This will be set by the service using the current user
-        // Add empty arrays for messages and commentTabs to match the schema
         messages: [],
         commentTabs: []
-      })
+      }
+
+      // Only add endDate if it has a value
+      if (formData.endDate) {
+        projectData.endDate = new Date(formData.endDate).getTime()
+      }
+
+      const newProject = await projectService.createProject(projectData)
 
       onProjectCreated(newProject)
       onClose()

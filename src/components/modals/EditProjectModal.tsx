@@ -135,14 +135,21 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
       const updateData: Partial<ProjectSchema> = {
         name: formData.name,
         description: formData.description,
-        startDate: formData.startDate
-          ? new Date(formData.startDate).getTime()
-          : undefined, // Changed from null to undefined
-        endDate: formData.endDate
-          ? new Date(formData.endDate).getTime()
-          : undefined, // Changed from null to undefined
         status: formData.status,
         managers: formData.managers
+      }
+
+      // Only add startDate if it has a value
+      if (formData.startDate) {
+        updateData.startDate = new Date(formData.startDate).getTime()
+      }
+
+      // Only add endDate if it has a value
+      if (formData.endDate) {
+        updateData.endDate = new Date(formData.endDate).getTime()
+      } else {
+        // Set endDate to null if empty string
+        updateData.endDate = null;
       }
 
       // Update project

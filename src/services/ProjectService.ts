@@ -26,9 +26,17 @@ export class ProjectService {
     try {
       const projectRef = doc(collection(this.db, 'projects'))
 
+      // Create a clean project object without undefined values
+      const cleanProjectData = { ...projectData };
+      
+      // Convert undefined endDate to null (Firestore can store null but not undefined)
+      if (cleanProjectData.endDate === undefined) {
+        cleanProjectData.endDate = null;
+      }
+
       const newProject: ProjectSchema = {
         id: projectRef.id,
-        ...projectData,
+        ...cleanProjectData,
         createdBy: auth.currentUser?.uid || '',
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -71,6 +79,11 @@ async addProjectMessage(
     attachments?: any[]
     messageType?: 'task_submission' | 'task_approval' | 'general'; // Type of message
     originalMessageId?: string
+    quotedMessage?: { // For quoted messages
+      userName: string;
+      content: string;
+      attachments?: any[];
+    }
   }
 ) {
   try {
@@ -84,12 +97,22 @@ async addProjectMessage(
     const projectData = projectDoc.data()
     const messages = projectData.messages || []
 
+    // Create a clean message object without undefined values
+    const cleanMessage = { ...message };
+    
+    // Remove undefined properties
+    Object.keys(cleanMessage).forEach(key => {
+      if (cleanMessage[key] === undefined) {
+        delete cleanMessage[key];
+      }
+    });
+
     await updateDoc(projectRef, {
-      messages: [...messages, message],
+      messages: [...messages, cleanMessage],
       updatedAt: Date.now()
     })
 
-    return message
+    return cleanMessage
   } catch (error) {
     console.error('Erro ao adicionar mensagem:', error)
     throw error
@@ -121,14 +144,24 @@ async addSystemMessageToProjectChat(
         const projectData = projectDoc.data() as ProjectSchema;
         let messages = projectData.messages || [];
 
+        // Create a clean message object without undefined values
+        const cleanMessage = { ...message };
+        
+        // Remove undefined properties
+        Object.keys(cleanMessage).forEach(key => {
+          if (cleanMessage[key] === undefined) {
+            delete cleanMessage[key];
+          }
+        });
+
         if (message.originalMessageId) {
             // This is an UPDATE to an existing message
             messages = messages.map((msg: any) =>
-                msg.id === message.originalMessageId ? { ...msg, content: message.content, timestamp: message.timestamp } : msg
+                msg.id === message.originalMessageId ? { ...msg, content: cleanMessage.content, timestamp: cleanMessage.timestamp } : msg
             );
         } else {
             // This is a NEW message
-            messages = [...messages, { ...message, id: Date.now().toString() }]; // Assign a unique ID
+            messages = [...messages, { ...cleanMessage, id: Date.now().toString() }]; // Assign a unique ID
         }
 
         await updateDoc(projectRef, {
@@ -162,8 +195,22 @@ async addSystemMessageToProjectChat(
     try {
       const projectRef = doc(this.db, 'projects', projectId)
 
+      // Create a clean updates object without undefined values
+      const cleanUpdates = { ...updates };
+      
+      // Remove undefined properties or convert them to null
+      Object.keys(cleanUpdates).forEach(key => {
+        if (cleanUpdates[key] === undefined) {
+          if (key === 'endDate') {
+            cleanUpdates[key] = null; // Convert undefined endDate to null
+          } else {
+            delete cleanUpdates[key]; // Remove other undefined properties
+          }
+        }
+      });
+
       await updateDoc(projectRef, {
-        ...updates,
+        ...cleanUpdates,
         updatedAt: Date.now()
       })
 
@@ -292,11 +339,21 @@ async fetchProjects(options?: {
       const projectData = projectDoc.data() as ProjectSchema
       const commentTabs = projectData.commentTabs || []
 
+      // Create a clean comment object without undefined values
+      const cleanComment = { ...comment };
+      
+      // Remove undefined properties
+      Object.keys(cleanComment).forEach(key => {
+        if (cleanComment[key] === undefined) {
+          delete cleanComment[key];
+        }
+      });
+
       const updatedTabs = commentTabs.map(tab => {
         if (tab.id === tabId) {
           return {
             ...tab,
-            comments: [...(tab.comments || []), comment]
+            comments: [...(tab.comments || []), cleanComment]
           }
         }
         return tab
