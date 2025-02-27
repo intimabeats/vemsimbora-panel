@@ -10,7 +10,8 @@ import {
   updateDoc,
   deleteDoc,
   getDocs,
-  getDoc
+  getDoc,
+  writeBatch
 } from 'firebase/firestore'
 import { NotificationSchema } from '../types/firestore-schema'
 import { auth } from '../config/firebase'
@@ -21,11 +22,10 @@ export class NotificationService {
   // Criar nova notificação para um usuário específico
   async createNotification(
     userId: string, 
-    notification: Omit<NotificationSchema, 'id' | 'read' | 'timestamp'>
+    notification: Omit<NotificationSchema, 'id' | 'read' | 'timestamp' | 'userId'>
   ): Promise<NotificationSchema> {
     try {
-      const notificationData: NotificationSchema = {
-        id: '', // Será preenchido pelo Firestore
+      const notificationData: Omit<NotificationSchema, 'id'> = {
         userId,
         ...notification,
         read: false,
@@ -128,7 +128,9 @@ export class NotificationService {
 
       const snapshot = await getDocs(notificationsQuery)
       
-      const batch = snapshot.docs.map(async (document) => {
+      const batch = writeBatch(this.db);
+      
+      snapshot.docs.forEach((document) => {
         const notificationRef = doc(
           this.db, 
           'users', 
@@ -136,10 +138,10 @@ export class NotificationService {
           'notifications', 
           document.id
         )
-        return updateDoc(notificationRef, { read: true })
-      })
+        batch.update(notificationRef, { read: true });
+      });
 
-      await Promise.all(batch)
+      await batch.commit();
     } catch (error) {
       console.error('Erro ao marcar todas as notificações como lidas:', error)
       throw error
@@ -161,7 +163,9 @@ export class NotificationService {
 
       const snapshot = await getDocs(notificationsQuery)
       
-      const batch = snapshot.docs.map(async (document) => {
+      const batch = writeBatch(this.db);
+      
+      snapshot.docs.forEach((document) => {
         const notificationRef = doc(
           this.db, 
           'users', 
@@ -169,10 +173,10 @@ export class NotificationService {
           'notifications', 
           document.id
         )
-        return deleteDoc(notificationRef)
-      })
+        batch.delete(notificationRef);
+      });
 
-      await Promise.all(batch)
+      await batch.commit();
     } catch (error) {
       console.error('Erro ao limpar notificações antigas:', error)
       throw error
@@ -182,11 +186,11 @@ export class NotificationService {
   // Criar notificações para múltiplos usuários
   async createBulkNotifications(
     userIds: string[], 
-    notification: Omit<NotificationSchema, 'id' | 'read' | 'timestamp' | 'userId'>
+    notificationData: Omit<NotificationSchema, 'id' | 'read' | 'timestamp' | 'userId'>
   ): Promise<void> {
     try {
       const notificationPromises = userIds.map(userId => 
-        this.createNotification(userId, notification)
+        this.createNotification(userId, notificationData)
       )
 
       await Promise.all(notificationPromises)
@@ -196,8 +200,8 @@ export class NotificationService {
     }
   }
 
-  // Helpers para criar notificações comuns
-  static createTaskNotification(
+  // Helper methods for creating common notification types
+  createTaskNotification(
     userId: string, 
     taskTitle: string, 
     taskId: string
@@ -211,7 +215,7 @@ export class NotificationService {
     }
   }
 
-  static createTaskAssignmentNotification(
+  createTaskAssignmentNotification(
     userId: string, 
     taskTitle: string, 
     taskId: string
@@ -225,7 +229,7 @@ export class NotificationService {
     }
   }
 
-  static createRewardNotification(
+  createRewardNotification(
     userId: string, 
     coins: number
   ): Omit<NotificationSchema, 'id' | 'read' | 'timestamp'> {

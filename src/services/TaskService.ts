@@ -114,17 +114,18 @@ export class TaskService {
         const projectData = await projectService.getProjectById(updatedTaskData.projectId);
 
         // Create notification for assigned users
-        for (const userId of updatedTaskData.assignedTo) {
+        if (updatedTaskData.assignedTo) {
           await notificationService.createNotification(
-            userId,
+            updatedTaskData.assignedTo,
             {
               type: 'task_updated',
               title: 'Task Status Updated',
               message: `Task '${updatedTaskData.title}' in project '${projectData.name}' has been updated to ${updatedTaskData.status}`,
-              relatedEntityId: taskId,
+              relatedEntityId: taskId
             }
           );
         }
+        
         //Notify project managers
         if (projectData && projectData.managers) {
           for (const managerId of projectData.managers) {
@@ -134,7 +135,7 @@ export class TaskService {
                 type: 'task_updated',
                 title: 'Task Status Updated',
                 message: `Task '${updatedTaskData.title}' in project '${projectData.name}' has been updated to ${updatedTaskData.status}`,
-                relatedEntityId: taskId,
+                relatedEntityId: taskId
               }
             );
           }
@@ -205,7 +206,7 @@ async fetchTasks(options?: {
     }
 
     if (options?.assignedTo) {
-      q = query(q, where('assignedTo', 'array-contains', options.assignedTo))
+      q = query(q, where('assignedTo', '==', options.assignedTo))
     }
 
     // Ordenação
@@ -389,7 +390,8 @@ async completeTaskAction(taskId: string, actionId: string, data?: any): Promise<
             ...updatedAction,
             data: {
               ...updatedAction.data,
-              content: data
+              steps: updatedAction.data?.steps || [],
+              fileURLs: updatedAction.data?.fileURLs || []
             }
           };
         }

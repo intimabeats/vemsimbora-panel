@@ -4,14 +4,17 @@ import {
   EmailAuthProvider,
   multiFactor,
   PhoneAuthProvider,
-  PhoneMultiFactorGenerator
+  PhoneMultiFactorGenerator,
+  RecaptchaVerifier
 } from 'firebase/auth'
 import { 
   getFirestore, 
   doc, 
   setDoc, 
   updateDoc,
-  getDoc
+  getDoc,
+  collection,
+  addDoc
 } from 'firebase/firestore'
 
 // Tipos de log de segurança
@@ -78,13 +81,21 @@ export const SecurityUtils = {
     try {
       const multiFactorUser = multiFactor(user)
       const phoneAuthProvider = new PhoneAuthProvider(auth)
+      
+      // Create a reCAPTCHA verifier (required for phone auth)
+      const appVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+      });
 
       // Iniciar registro de telefone
       const session = await multiFactorUser.getSession()
-      const phoneVerificationInfo = await phoneAuthProvider.verifyPhoneNumber({
-        phoneNumber,
-        multiFactorSession: session
-      })
+      const phoneVerificationInfo = await phoneAuthProvider.verifyPhoneNumber(
+        {
+          phoneNumber,
+          session
+        }, 
+        appVerifier
+      )
 
       return phoneVerificationInfo
     } catch (error) {
@@ -102,11 +113,9 @@ export const SecurityUtils = {
     const db = getFirestore()
 
     try {
-      const logRef = doc(
-        collection(db, 'users', userId, 'security_logs')
-      )
-
-      await setDoc(logRef, {
+      const securityLogsCollection = collection(db, 'users', userId, 'security_logs')
+      
+      await addDoc(securityLogsCollection, {
         type: eventType,
         timestamp: Date.now(),
         ...details

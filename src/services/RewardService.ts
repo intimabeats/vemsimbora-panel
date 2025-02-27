@@ -51,10 +51,11 @@ export class RewardService {
       // Criar notificação de recompensa
       await notificationService.createNotification(
         rewardData.userId,
-        notificationService.createRewardNotification(
-          rewardData.userId, 
-          rewardData.amount
-        )
+        {
+          type: 'reward_earned',
+          title: 'Recompensa Recebida',
+          message: `Você ganhou ${rewardData.amount} moedas!`
+        }
       )
 
       return newReward

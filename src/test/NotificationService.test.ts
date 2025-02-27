@@ -1,44 +1,56 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { NotificationService, NotificationHelpers } from '../services/NotificationService'
-import { Notification } from '../types/notification'
+import { notificationService } from '../services/NotificationService'
+import { NotificationSchema } from '../types/firestore-schema'
 
 // Mock Firestore functions
-vi.mock('firebase/firestore', () => ({
-  getFirestore: vi.fn(),
-  collection: vi.fn(),
-  addDoc: vi.fn(),
-  query: vi.fn(),
-  where: vi.fn(),
-  orderBy: vi.fn(),
-  limit: vi.fn(),
-  getDocs: vi.fn().mockResolvedValue({
-    docs: [
-      { 
-        id: 'notification1', 
-        data: () => ({
-          type: 'task_created',
-          title: 'Nova Tarefa',
-          message: 'Tarefa criada',
-          timestamp: Date.now(),
-          read: false
-        }) 
-      }
-    ]
-  }),
-  updateDoc: vi.fn(),
-  deleteDoc: vi.fn()
-}))
+vi.mock('firebase/firestore', () => {
+  const updateDocMock = vi.fn().mockResolvedValue(undefined);
+  const writeBatchMock = vi.fn().mockReturnValue({
+    update: vi.fn(),
+    delete: vi.fn(),
+    commit: vi.fn().mockResolvedValue(true)
+  });
+  
+  return {
+    getFirestore: vi.fn(),
+    collection: vi.fn(),
+    addDoc: vi.fn().mockResolvedValue({ id: 'new-notification-id' }),
+    query: vi.fn(),
+    where: vi.fn(),
+    orderBy: vi.fn(),
+    limit: vi.fn(),
+    getDocs: vi.fn().mockResolvedValue({
+      docs: [
+        { 
+          id: 'notification1', 
+          data: () => ({
+            userId: 'test-user-id',
+            type: 'task_created',
+            title: 'Nova Tarefa',
+            message: 'Tarefa criada',
+            timestamp: Date.now(),
+            read: false
+          }) 
+        }
+      ]
+    }),
+    updateDoc: updateDocMock,
+    deleteDoc: vi.fn(),
+    doc: vi.fn(),
+    writeBatch: writeBatchMock
+  };
+});
 
 describe('NotificationService', () => {
   const userId = 'test-user-id'
   const mockNotification = {
-    type: 'task_created',
+    type: 'task_created' as NotificationSchema['type'],
     title: 'Test Notification',
     message: 'Test Message'
   }
 
   it('should create a notification', async () => {
-    const result = await NotificationService.createNotification(
+    const result = await notificationService.createNotification(
       userId, 
       mockNotification
     )
@@ -49,38 +61,48 @@ describe('NotificationService', () => {
   })
 
   it('should fetch user notifications', async () => {
-    const notifications = await NotificationService.getUserNotifications(userId)
+    const notifications = await notificationService.getUserNotifications(userId)
     
     expect(notifications).toHaveLength(1)
     expect(notifications[0]).toHaveProperty('id', 'notification1')
   })
 
   it('should mark notification as read', async () => {
-    await NotificationService.markNotificationAsRead(userId, 'notification1')
+    const { updateDoc } = await import('firebase/firestore');
+    await notificationService.markNotificationAsRead(userId, 'notification1')
     
-    // Verificar se updateDoc foi chamado
-    expect(vi.fn()).toHaveBeenCalled()
+    // Verify updateDoc was called
+    expect(updateDoc).toHaveBeenCalled()
   })
 
-  describe('NotificationHelpers', () => {
-    it('should create task created notification', () => {
-      const notification = NotificationHelpers.taskCreated(
-        'Desenvolver Relatório', 
-        'João Silva'
-      )
+  it('should mark all notifications as read', async () => {
+    const { writeBatch } = await import('firebase/firestore');
+    await notificationService.markAllNotificationsAsRead(userId)
+    
+    // Verify batch operations were performed
+    expect(writeBatch).toHaveBeenCalled()
+  })
 
-      expect(notification.type).toBe('task_created')
-      expect(notification.title).toBe('Nova Tarefa Criada')
-    })
+  it('should create task notification', () => {
+    const notification = notificationService.createTaskNotification(
+      'user123',
+      'Test Task',
+      'task123'
+    )
 
-    it('should create task approved notification', () => {
-      const notification = NotificationHelpers.taskApproved(
-        'Relatório Concluído', 
-        50
-      )
+    expect(notification.type).toBe('task_created')
+    expect(notification.userId).toBe('user123')
+    expect(notification.relatedEntityId).toBe('task123')
+  })
 
-      expect(notification.type).toBe('task_approved')
-      expect(notification.message).toContain('50 moedas')
-    })
+  it('should create reward notification', () => {
+    const notification = notificationService.createRewardNotification(
+      'user123',
+      50
+    )
+
+    expect(notification.type).toBe('reward_earned')
+    expect(notification.userId).toBe('user123')
+    expect(notification.message).toContain('50 moedas')
   })
 })

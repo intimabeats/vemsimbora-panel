@@ -27,7 +27,7 @@ export class FirestoreService {
   // Método genérico para adicionar documento
   async addDocument<T>(
     collectionName: string, 
-    data: T, 
+    data: Omit<T, 'id' | 'createdAt' | 'updatedAt'>, 
     customId?: string
   ): Promise<string> {
     try {
@@ -35,11 +35,13 @@ export class FirestoreService {
         ? doc(this.db, collectionName, customId)
         : doc(collection(this.db, collectionName))
       
-      await setDoc(docRef, {
+      const documentData = {
         ...data,
         createdAt: Date.now(),
         updatedAt: Date.now()
-      })
+      };
+
+      await setDoc(docRef, documentData);
 
       return docRef.id
     } catch (error) {
@@ -130,13 +132,15 @@ export class FirestoreService {
 
 // Serviços específicos
 export const UserService = {
-  async createUser(userData: Omit<UserSchema, 'id' | 'createdAt' | 'updatedAt'>) {
+  async createUser(userData: Omit<UserSchema, 'id' | 'createdAt' | 'updatedAt' | 'coins'>) {
     const firestoreService = new FirestoreService()
-    return firestoreService.addDocument<UserSchema>('users', {
+    const userId = await firestoreService.addDocument<UserSchema>('users', {
       ...userData,
       coins: 0,
       status: 'active'
     })
+    
+    return userId;
   },
 
   async updateUserProfile(userId: string, updates: Partial<UserSchema>) {
@@ -148,23 +152,27 @@ export const UserService = {
 export const ProjectService = {
   async createProject(projectData: Omit<ProjectSchema, 'id' | 'createdAt' | 'updatedAt'>) {
     const firestoreService = new FirestoreService()
-    return firestoreService.addDocument<ProjectSchema>('projects', {
+    const projectId = await firestoreService.addDocument<ProjectSchema>('projects', {
       ...projectData,
       status: 'planning',
       createdBy: auth.currentUser?.uid || ''
     })
+    
+    return projectId;
   }
 }
 
 export const TaskService = {
   async createTask(taskData: Omit<TaskSchema, 'id' | 'createdAt' | 'updatedAt'>) {
     const firestoreService = new FirestoreService()
-    return firestoreService.addDocument<TaskSchema>('tasks', {
+    const taskId = await firestoreService.addDocument<TaskSchema>('tasks', {
       ...taskData,
       status: 'pending',
       createdBy: auth.currentUser?.uid || '',
       subtasks: taskData.subtasks || [],
       comments: taskData.comments || []
     })
+    
+    return taskId;
   }
 }
