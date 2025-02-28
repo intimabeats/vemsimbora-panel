@@ -12,7 +12,10 @@ import {
   where,
   orderBy,
   limit,
-  startAfter
+  startAfter,
+  QueryConstraint,
+  DocumentData,
+  QuerySnapshot
 } from 'firebase/firestore'
 import { auth } from '../config/firebase'
 import { ProjectSchema } from '../types/firestore-schema'
@@ -68,59 +71,60 @@ export class ProjectService {
       throw error
     }
   }
-async addProjectMessage(
-  projectId: string, 
-  message: {
-    id: string
-    userId: string
-    userName: string
-    content: string
-    timestamp: number
-    attachments?: any[]
-    messageType?: 'task_submission' | 'task_approval' | 'general'; // Type of message
-    originalMessageId?: string
-    quotedMessage?: { // For quoted messages
-      userName: string;
-      content: string;
-      attachments?: any[];
-    }
-  }
-) {
-  try {
-    const projectRef = doc(this.db, 'projects', projectId)
-    const projectDoc = await getDoc(projectRef)
-    
-    if (!projectDoc.exists()) {
-      throw new Error('Projeto não encontrado')
-    }
-
-    const projectData = projectDoc.data()
-    const messages = projectData.messages || []
-
-    // Create a clean message object without undefined values
-    const cleanMessage = { ...message };
-    
-    // Remove undefined properties
-    Object.keys(cleanMessage).forEach(key => {
-      if (cleanMessage[key] === undefined) {
-        delete cleanMessage[key];
+  
+  async addProjectMessage(
+    projectId: string, 
+    message: {
+      id: string
+      userId: string
+      userName: string
+      content: string
+      timestamp: number
+      attachments?: any[]
+      messageType?: 'task_submission' | 'task_approval' | 'general'; // Type of message
+      originalMessageId?: string
+      quotedMessage?: { // For quoted messages
+        userName: string;
+        content: string;
+        attachments?: any[];
       }
-    });
+    }
+  ) {
+    try {
+      const projectRef = doc(this.db, 'projects', projectId)
+      const projectDoc = await getDoc(projectRef)
+      
+      if (!projectDoc.exists()) {
+        throw new Error('Projeto não encontrado')
+      }
 
-    await updateDoc(projectRef, {
-      messages: [...messages, cleanMessage],
-      updatedAt: Date.now()
-    })
+      const projectData = projectDoc.data()
+      const messages = projectData.messages || []
 
-    return cleanMessage
-  } catch (error) {
-    console.error('Erro ao adicionar mensagem:', error)
-    throw error
+      // Create a clean message object without undefined values
+      const cleanMessage = { ...message };
+      
+      // Remove undefined properties
+      Object.keys(cleanMessage).forEach(key => {
+        if (cleanMessage[key] === undefined) {
+          delete cleanMessage[key];
+        }
+      });
+
+      await updateDoc(projectRef, {
+        messages: [...messages, cleanMessage],
+        updatedAt: Date.now()
+      })
+
+      return cleanMessage
+    } catch (error) {
+      console.error('Erro ao adicionar mensagem:', error)
+      throw error
+    }
   }
-}
 
-// NEW: Add a system message, handling updates for existing messages
-async addSystemMessageToProjectChat(
+  // NEW: Add a system message, handling updates for existing messages
+  async addSystemMessageToProjectChat(
     projectId: string,
     message: {
         userId: string;
@@ -132,7 +136,7 @@ async addSystemMessageToProjectChat(
         originalMessageId?: string; // ID of the original message, if this is an update
         quotedMessage?: { userName: string; content: string; attachments?: any[] };
     }
-): Promise<void> {
+  ): Promise<void> {
     try {
         const projectRef = doc(this.db, 'projects', projectId);
         const projectDoc = await getDoc(projectRef);
@@ -172,24 +176,25 @@ async addSystemMessageToProjectChat(
         console.error('Error adding system message:', error);
         throw error;
     }
-}
-
-	async getProjectMessages(projectId: string): Promise<any[]> {
-  try {
-    const projectRef = doc(this.db, 'projects', projectId)
-    const projectDoc = await getDoc(projectRef)
-    
-    if (!projectDoc.exists()) {
-      throw new Error('Projeto não encontrado')
-    }
-
-    const projectData = projectDoc.data()
-    return projectData.messages || []
-  } catch (error) {
-    console.error('Erro ao buscar mensagens:', error)
-    throw error
   }
-}
+
+  async getProjectMessages(projectId: string): Promise<any[]> {
+    try {
+      const projectRef = doc(this.db, 'projects', projectId)
+      const projectDoc = await getDoc(projectRef)
+      
+      if (!projectDoc.exists()) {
+        throw new Error('Projeto não encontrado')
+      }
+
+      const projectData = projectDoc.data()
+      return projectData.messages || []
+    } catch (error) {
+      console.error('Erro ao buscar mensagens:', error)
+      throw error
+    }
+  }
+  
   // Atualizar projeto
   async updateProject(projectId: string, updates: Partial<ProjectSchema>) {
     try {
@@ -245,65 +250,64 @@ async addSystemMessageToProjectChat(
     }
   }
 
- // Buscar projetos com paginação e filtros
-async fetchProjects(options?: {
-  status?: ProjectSchema['status'];
-  excludeStatus?: ProjectSchema['status'];
-  limit?: number;
-  page?: number;
-}) {
-  try {
-    // Create a base query
-    let q = query(collection(this.db, 'projects'));
-    
-    // Apply status filter if provided and not empty string
-    if (options?.status) {
-      q = query(q, where('status', '==', options.status));
-    } 
-    // Apply excludeStatus filter if no status filter is provided or it's empty
-    else if (options?.excludeStatus) {
-      q = query(q, where('status', '!=', options.excludeStatus));
-    }
-
-    // Apply ordering
-    q = query(q, orderBy('createdAt', 'desc'));
-
-    // Execute query
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) {
-      // Return empty results if no projects found
+  // Buscar projetos com paginação e filtros
+  async fetchProjects(options?: {
+    status?: ProjectSchema['status'];
+    excludeStatus?: ProjectSchema['status'];
+    limit?: number;
+    page?: number;
+  }) {
+    try {
+      // Get all projects first to avoid index issues
+      const projectsCollection = collection(this.db, 'projects');
+      const snapshot = await getDocs(projectsCollection);
+      
+      if (snapshot.empty) {
+        return {
+          data: [],
+          totalPages: 0,
+          totalProjects: 0
+        };
+      }
+      
+      // Convert to ProjectSchema objects
+      let allProjects = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as ProjectSchema));
+      
+      // Apply filters in memory instead of in the query
+      if (options?.status) {
+        allProjects = allProjects.filter(project => project.status === options.status);
+      } else if (options?.excludeStatus) {
+        allProjects = allProjects.filter(project => project.status !== options.excludeStatus);
+      }
+      
+      // Sort by createdAt in descending order
+      allProjects.sort((a, b) => b.createdAt - a.createdAt);
+      
+      // Get total count before pagination
+      const totalProjects = allProjects.length;
+      
+      // Apply pagination
+      const limit = options?.limit || 10;
+      const page = options?.page || 1;
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      
+      const paginatedProjects = allProjects.slice(startIndex, endIndex);
+      const totalPages = Math.ceil(totalProjects / limit);
+      
       return {
-        data: [],
-        totalPages: 0,
-        totalProjects: 0
+        data: paginatedProjects,
+        totalPages: totalPages || 1, // Ensure at least 1 page
+        totalProjects: totalProjects
       };
+    } catch (error) {
+      console.error('Erro ao buscar projetos:', error);
+      throw new Error('Failed to load projects. Please try again.');
     }
-    
-    const allProjects = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as ProjectSchema));
-
-    // Pagination
-    const limit = options?.limit || 10;
-    const page = options?.page || 1;
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-
-    const paginatedProjects = allProjects.slice(startIndex, endIndex);
-    const totalPages = Math.ceil(allProjects.length / limit);
-
-    return {
-      data: paginatedProjects,
-      totalPages: totalPages || 1, // Ensure at least 1 page
-      totalProjects: allProjects.length
-    };
-  } catch (error) {
-    console.error('Erro ao buscar projetos:', error);
-    throw new Error('Failed to load projects. Please try again.');
   }
-}
 
   // Buscar projeto por ID
   async getProjectById(projectId: string): Promise<ProjectSchema> {
@@ -380,33 +384,33 @@ async fetchProjects(options?: {
     }
   }
 
-    // Arquivar projeto
-    async archiveProject(projectId: string): Promise<void> {
-        try {
-            const projectRef = doc(this.db, 'projects', projectId);
-            await updateDoc(projectRef, {
-                status: 'archived',
-                updatedAt: Date.now()
-            });
-        } catch (error) {
-            console.error('Error archiving project:', error);
-            throw error;
-        }
+  // Arquivar projeto
+  async archiveProject(projectId: string): Promise<void> {
+    try {
+      const projectRef = doc(this.db, 'projects', projectId);
+      await updateDoc(projectRef, {
+        status: 'archived',
+        updatedAt: Date.now()
+      });
+    } catch (error) {
+      console.error('Error archiving project:', error);
+      throw error;
     }
+  }
 
-    // Desarquivar projeto
-    async unarchiveProject(projectId: string): Promise<void> {
-        try {
-            const projectRef = doc(this.db, 'projects', projectId);
-            await updateDoc(projectRef, {
-                status: 'planning', // Or any other default status
-                updatedAt: Date.now()
-            });
-        } catch (error) {
-            console.error('Error unarchiving project:', error);
-            throw error;
-        }
+  // Desarquivar projeto
+  async unarchiveProject(projectId: string): Promise<void> {
+    try {
+      const projectRef = doc(this.db, 'projects', projectId);
+      await updateDoc(projectRef, {
+        status: 'planning', // Or any other default status
+        updatedAt: Date.now()
+      });
+    } catch (error) {
+      console.error('Error unarchiving project:', error);
+      throw error;
     }
+  }
 }
 
 export const projectService = new ProjectService()
