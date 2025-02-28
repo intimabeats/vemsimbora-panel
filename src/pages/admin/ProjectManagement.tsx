@@ -31,7 +31,7 @@ export const ProjectManagement: React.FC = () => {
   const [projects, setProjects] = useState<ProjectSchema[]>([])
   const [isLoading, setLoading] = useState(true)
   const [filter, setFilter] = useState<{
-    status?: FilterStatus // Updated type to include empty string
+    status: FilterStatus // Updated type to include empty string
   }>({ status: '' })
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearchTerm = useDebounce(searchTerm, 500)
@@ -66,7 +66,7 @@ export const ProjectManagement: React.FC = () => {
       };
 
       // Only set status filter if it's not empty
-      if (filter.status && filter.status !== '') {
+      if (filter.status) {
         options.status = filter.status as ProjectSchema['status'];
       } else {
         // Only exclude archived when no specific status is selected
