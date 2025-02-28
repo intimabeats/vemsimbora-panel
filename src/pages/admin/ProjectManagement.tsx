@@ -11,7 +11,9 @@ import {
   FolderOpen,
   Calendar,
   Users,
-  Filter
+  Filter,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ProjectSchema } from '../../types/firestore-schema'
@@ -44,6 +46,7 @@ export const ProjectManagement: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isRetrying, setIsRetrying] = useState(false)
 
   // useCallback to prevent unnecessary re-renders of fetchProjects
   const fetchProjects = useCallback(async () => {
@@ -71,12 +74,13 @@ export const ProjectManagement: React.FC = () => {
 
       const fetchedProjects = await projectService.fetchProjects(options);
       setProjects(fetchedProjects.data);
-      setTotalPages(fetchedProjects.totalPages);
-    } catch (error) {
+      setTotalPages(fetchedProjects.totalPages || 1); // Ensure at least 1 page
+    } catch (error: any) {
       console.error('Error fetching projects:', error);
-      setError('Failed to load projects. Please try again.');
+      setError(error.message || 'Failed to load projects. Please try again.');
     } finally {
       setLoading(false);
+      setIsRetrying(false);
     }
   }, [filter.status, currentPage, itemsPerPage]);
 
@@ -94,9 +98,9 @@ export const ProjectManagement: React.FC = () => {
       )
       setSelectedProject(null)
       setIsDeleteModalOpen(false)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting project:', error)
-      setError('Failed to delete project. Please try again.')
+      setError(error.message || 'Failed to delete project. Please try again.')
     }
   }
 
@@ -127,9 +131,9 @@ export const ProjectManagement: React.FC = () => {
       await projectService.archiveProject(projectId);
       // Refresh the project list
       fetchProjects();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error archiving project:', error);
-      setError('Failed to archive project. Please try again.');
+      setError(error.message || 'Failed to archive project. Please try again.');
     }
   };
 
@@ -138,10 +142,15 @@ export const ProjectManagement: React.FC = () => {
       await projectService.unarchiveProject(projectId);
       // Refresh the project list
       fetchProjects();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error unarchiving project:', error);
-      setError('Failed to unarchive project. Please try again.');
+      setError(error.message || 'Failed to unarchive project. Please try again.');
     }
+  };
+
+  const handleRetry = () => {
+    setIsRetrying(true);
+    fetchProjects();
   };
 
   const StatusBadge: React.FC<{ status: ProjectSchema['status'] }> = ({ status }) => {
@@ -211,12 +220,28 @@ export const ProjectManagement: React.FC = () => {
             </button>
           </div>
 
-          {/* Error Message */}
+          {/* Error Message with Retry Button */}
           {error && (
-            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md shadow-sm">
-              <p className="flex items-center">
-                <span className="mr-2">⚠️</span> {error}
-              </p>
+            <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md shadow-sm flex justify-between items-center">
+              <div className="flex items-center">
+                <AlertCircle className="mr-2 flex-shrink-0" size={20} />
+                <p>{error}</p>
+              </div>
+              <button 
+                onClick={handleRetry} 
+                disabled={isRetrying}
+                className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center"
+              >
+                {isRetrying ? (
+                  <>
+                    <RefreshCw className="mr-1 animate-spin" size={16} /> Tentando...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-1" size={16} /> Tentar novamente
+                  </>
+                )}
+              </button>
             </div>
           )}
 

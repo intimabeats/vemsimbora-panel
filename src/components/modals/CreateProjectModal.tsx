@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import {
   Briefcase,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react'
 import { projectService } from '../../services/ProjectService'
 import { ProjectSchema } from '../../types/firestore-schema'
@@ -37,36 +38,38 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const { currentUser } = useAuth(); // Get current user for createdBy field
 
   // Fetch managers
-useEffect(() => {
-  const fetchManagers = async () => {
-    setManagersLoading(true);
-    setError(null);
-    try {
-      // Explicitly specify the role filter.
-      const fetchedManagers = await userManagementService.fetchUsers({ role: 'manager' });
+  useEffect(() => {
+    const fetchManagers = async () => {
+      if (!isOpen) return; // Don't fetch if modal is closed
+      
+      setManagersLoading(true);
+      setError(null);
+      try {
+        // Explicitly specify the role filter.
+        const fetchedManagers = await userManagementService.fetchUsers({ role: 'manager' });
 
-      // Map the results to the expected { id, name } format.
-      const managerList = fetchedManagers.data.map(user => ({
-        id: user.id,
-        name: user.name
-      }));
-      setManagers(managerList);
+        // Map the results to the expected { id, name } format.
+        const managerList = fetchedManagers.data.map(user => ({
+          id: user.id,
+          name: user.name
+        }));
+        setManagers(managerList);
 
-    } catch (err: any) {
-      console.error('Error fetching managers:', err);  // Detailed error logging
-      setError(err.message || 'Failed to load managers.');
-    } finally {
-      setManagersLoading(false);
+      } catch (err: any) {
+        console.error('Error fetching managers:', err);  // Detailed error logging
+        setError(err.message || 'Failed to load managers. Please try again.');
+      } finally {
+        setManagersLoading(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchManagers();
     }
-  };
-
-  if (isOpen) {
-    fetchManagers();
-  }
-}, [isOpen]);
+  }, [isOpen]);
 
 
-    // Reset form when modal opens/closes
+  // Reset form when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
       setFormData({
@@ -104,16 +107,22 @@ useEffect(() => {
   // Validations
   const validateStep1 = () => {
     const errors: { [key: string]: string } = {}
-    if (!formData.name.trim()) errors.name = 'Project name is required'
-    if (!formData.description.trim()) errors.description = 'Description is required'
+    if (!formData.name.trim()) errors.name = 'Nome do projeto é obrigatório'
+    if (!formData.description.trim()) errors.description = 'Descrição é obrigatória'
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
   const validateStep2 = () => {
     const errors: { [key: string]: string } = {}
-    if (!formData.startDate) errors.startDate = 'Start date is required'
-    if (formData.managers.length === 0) errors.managers = 'At least one manager is required'
+    if (!formData.startDate) errors.startDate = 'Data de início é obrigatória'
+    if (formData.managers.length === 0) errors.managers = 'Pelo menos um gestor é obrigatório'
+    
+    // Validate that end date is after start date if provided
+    if (formData.endDate && new Date(formData.endDate) <= new Date(formData.startDate)) {
+      errors.endDate = 'A data de término deve ser posterior à data de início'
+    }
+    
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -150,7 +159,7 @@ useEffect(() => {
       onProjectCreated(newProject)
       onClose()
     } catch (err: any) {
-      setError(err.message || 'Erro ao criar projeto')
+      setError(err.message || 'Erro ao criar projeto. Por favor, tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -164,7 +173,7 @@ useEffect(() => {
         <div className="flex justify-between items-center p-6 border-b">
           <h2 className="text-xl font-bold flex items-center">
             <Briefcase className="mr-2 text-blue-600" />
-            Criar Novo Projeto (Step {step}/2)
+            Criar Novo Projeto (Etapa {step}/2)
           </h2>
           <button
             onClick={onClose}
@@ -194,7 +203,7 @@ useEffect(() => {
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.name ? 'border-red-500' : 'focus:ring-blue-500'}`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.name ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}`}
                 />
                 {formErrors.name && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.name}</p>
@@ -209,7 +218,7 @@ useEffect(() => {
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.description ? 'border-red-500' : 'focus:ring-blue-500'}`}
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.description ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}`}
                 />
                 {formErrors.description && (
                   <p className="text-red-500 text-xs mt-1">{formErrors.description}</p>
@@ -225,7 +234,7 @@ useEffect(() => {
                 }}
                 className="w-full py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition"
               >
-                Next
+                Próximo
               </button>
             </>
           )}
@@ -242,7 +251,7 @@ useEffect(() => {
                     name="startDate"
                     value={formData.startDate}
                     onChange={handleChange}
-                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.startDate ? 'border-red-500' : 'focus:ring-blue-500'}`}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.startDate ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}`}
                   />
                   {formErrors.startDate && (
                     <p className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>
@@ -258,8 +267,11 @@ useEffect(() => {
                     name="endDate"
                     value={formData.endDate}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${formErrors.endDate ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}`}
                   />
+                  {formErrors.endDate && (
+                    <p className="text-red-500 text-xs mt-1">{formErrors.endDate}</p>
+                  )}
                 </div>
               </div>
 
@@ -286,34 +298,57 @@ useEffect(() => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Gestores
                 </label>
-                <select
-                  multiple
-                  name="managers"
-                  value={formData.managers}
-                  onChange={(e) => {
-                    const selectedManagers = Array.from(e.target.selectedOptions, option => option.value)
-                    setFormData(prev => ({
-                      ...prev,
-                      managers: selectedManagers
-                    }))
-                  }}
-                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.managers ? 'border-red-500' : 'focus:ring-blue-500'}`}
-                  disabled={managersLoading}
-                >
-                  {managersLoading ? (
-                    <option>Loading...</option>
-                  ) : managers.length > 0 ? (
-                    managers.map(manager => (
-                      <option key={manager.id} value={manager.id}>
-                        {manager.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>No managers found</option>
-                  )}
-                </select>
-                {formErrors.managers && (
-                  <p className="text-red-500 text-xs mt-1">{formErrors.managers}</p>
+                {managersLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="animate-spin text-blue-600 mr-2" size={20} />
+                    <span className="text-gray-600">Carregando gestores...</span>
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      multiple
+                      name="managers"
+                      value={formData.managers}
+                      onChange={(e) => {
+                        const selectedManagers = Array.from(e.target.selectedOptions, option => option.value)
+                        setFormData(prev => ({
+                          ...prev,
+                          managers: selectedManagers
+                        }))
+                        
+                        // Clear error when managers are selected
+                        if (formErrors.managers && selectedManagers.length > 0) {
+                          setFormErrors(prev => {
+                            const newErrors = { ...prev };
+                            delete newErrors.managers;
+                            return newErrors;
+                          });
+                        }
+                      }}
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 h-24 ${formErrors.managers ? 'border-red-500 focus:ring-red-500' : 'focus:ring-blue-500'}`}
+                    >
+                      {managers.length > 0 ? (
+                        managers.map(manager => (
+                          <option key={manager.id} value={manager.id}>
+                            {manager.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option disabled>Nenhum gestor encontrado</option>
+                      )}
+                    </select>
+                    {managers.length === 0 && !managersLoading && (
+                      <p className="text-yellow-600 text-xs mt-1">
+                        Nenhum gestor disponível. Adicione gestores no sistema primeiro.
+                      </p>
+                    )}
+                    {formErrors.managers && (
+                      <p className="text-red-500 text-xs mt-1">{formErrors.managers}</p>
+                    )}
+                    <p className="text-gray-500 text-xs mt-1">
+                      Segure Ctrl (ou Cmd no Mac) para selecionar múltiplos gestores.
+                    </p>
+                  </>
                 )}
               </div>
 
@@ -323,18 +358,25 @@ useEffect(() => {
                   onClick={() => setStep(1)}
                   className="w-full py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
                 >
-                  Back
+                  Voltar
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
-                  className={`w-full py-2 rounded-lg text-white transition 
-                    ${loading
+                  disabled={loading || managersLoading}
+                  className={`w-full py-2 rounded-lg text-white transition flex items-center justify-center
+                    ${loading || managersLoading
                       ? 'bg-blue-400 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700'
                     }`}
                 >
-                  {loading ? 'Criando...' : 'Criar Projeto'}
+                  {loading ? (
+                    <>
+                      <Loader2 className="animate-spin mr-2" size={20} />
+                      Criando...
+                    </>
+                  ) : (
+                    'Criar Projeto'
+                  )}
                 </button>
               </div>
             </>

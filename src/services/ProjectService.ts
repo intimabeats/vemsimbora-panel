@@ -271,6 +271,15 @@ async fetchProjects(options?: {
     // Execute query
     const snapshot = await getDocs(q);
     
+    if (snapshot.empty) {
+      // Return empty results if no projects found
+      return {
+        data: [],
+        totalPages: 0,
+        totalProjects: 0
+      };
+    }
+    
     const allProjects = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -287,12 +296,12 @@ async fetchProjects(options?: {
 
     return {
       data: paginatedProjects,
-      totalPages,
+      totalPages: totalPages || 1, // Ensure at least 1 page
       totalProjects: allProjects.length
     };
   } catch (error) {
     console.error('Erro ao buscar projetos:', error);
-    throw error;
+    throw new Error('Failed to load projects. Please try again.');
   }
 }
 
