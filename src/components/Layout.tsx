@@ -12,7 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
-    User // Import the User icon
+  User,
+  FileText
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
@@ -23,13 +24,14 @@ type Role = 'admin' | 'manager' | 'employee';
 
 type SidebarProps = {
   role: Role;
-  isSidebarHidden: boolean; // Receive isSidebarHidden
-  toggleSidebar: () => void; // Receive toggleSidebar
+  isSidebarHidden: boolean;
+  toggleSidebar: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ role, isSidebarHidden, toggleSidebar }) => { // Receive props
+const Sidebar: React.FC<SidebarProps> = ({ role, isSidebarHidden, toggleSidebar }) => {
   const { logout, currentUser } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const commonLinks = [
     { icon: Home, label: 'Dashboard', href: `/${role}/dashboard` }
@@ -40,6 +42,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isSidebarHidden, toggleSidebar 
       { icon: Briefcase, label: 'Projetos', href: '/admin/projects' },
       { icon: CheckCircle, label: 'Tarefas', href: '/admin/tasks' },
       { icon: Users, label: 'Usuários', href: '/admin/user-management' },
+      { icon: FileText, label: 'Modelos de Ação', href: '/admin/action-templates' },
       { icon: Settings, label: 'Configurações', href: '/admin/settings' },
     ],
     manager: [
@@ -64,16 +67,20 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isSidebarHidden, toggleSidebar 
     }
   }
 
+  const isActive = (href: string) => {
+    return location.pathname === href || location.pathname.startsWith(`${href}/`);
+  }
+
   return (
     <>
       {/* Desktop Sidebar */}
       <div
-        className={`hidden md:flex flex-col bg-white border-r shadow-md h-screen fixed left-0 top-0  transition-all duration-300 ${isSidebarHidden ? 'w-16' : 'w-[calc(64*4px-30px)]'
-          } overflow-hidden`}
+        className={`hidden md:flex flex-col bg-white border-r shadow-md h-screen fixed left-0 top-0 transition-all duration-300 ${isSidebarHidden ? 'w-16' : 'w-[calc(64*4px-30px)]'
+          } overflow-hidden z-10`}
       >
         {/* Toggle Button (Above Profile) */}
         <button
-          onClick={toggleSidebar} // Use the passed toggleSidebar function
+          onClick={toggleSidebar}
           className="p-4 text-gray-600 hover:text-gray-900 flex justify-center items-center"
         >
           {isSidebarHidden ? <ChevronRight size={24} /> : <ChevronLeft size={24} />}
@@ -102,43 +109,62 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isSidebarHidden, toggleSidebar 
           </Link>
         </div>
 
+        <nav className="flex-1 overflow-y-auto px-2">
+          {/* Main Navigation Links */}
+          <div className="space-y-1">
+            {links.map((link, index) => (
+              <Link
+                key={index}
+                to={link.href}
+                className={`flex items-center py-3 px-3 rounded-lg transition ${
+                  isActive(link.href) 
+                    ? 'bg-blue-50 text-blue-600' 
+                    : 'hover:bg-gray-100 text-gray-700'
+                } ${isSidebarHidden ? 'justify-center' : ''}`}
+              >
+                <link.icon className={`${isActive(link.href) ? 'text-blue-600' : 'text-gray-600'}`} size={20} />
+                {!isSidebarHidden && <span className="ml-3">{link.label}</span>}
+              </Link>
+            ))}
+          </div>
 
-        <nav className="flex-1 overflow-y-auto">
-          {/* Notification Link (Always Visible) */}
-          <Link
-            to="/notifications"
-            className={`flex items-center py-3 hover:bg-gray-100 rounded-lg transition ${isSidebarHidden ? 'justify-center px-0' : 'px-4'}`}
-          >
-            <Bell className={`text-gray-500 ${!isSidebarHidden ? 'mr-3' : ''}`} size={20} />
-            {!isSidebarHidden && <span className="text-gray-500">Notificações</span>}
-          </Link>
-          {/* Spacing */}
-          <div className="py-4"></div>
-          {/* My Profile Link */}
-          <Link
-            to={`/profile/${currentUser?.uid}`}
-            className={`flex items-center py-3  hover:bg-gray-100 rounded-lg transition  ${isSidebarHidden ? 'justify-center px-0' : 'px-4'}`}
-          >
-            <User className=" text-gray-600" size={20} />
-            {!isSidebarHidden && <span className="ml-3 text-gray-700">Meu Perfil</span>}
-          </Link>
+          {/* Divider */}
+          <div className="my-4 border-t border-gray-200"></div>
 
-          {links.map((link, index) => (
+          {/* Utility Links */}
+          <div className="space-y-1">
+            {/* Notification Link */}
             <Link
-              key={index}
-              to={link.href}
-              className={`flex items-center py-3  hover:bg-gray-100 rounded-lg transition  ${isSidebarHidden ? 'justify-center px-0' : 'px-4'}`}
+              to="/notifications"
+              className={`flex items-center py-3 px-3 rounded-lg transition ${
+                isActive('/notifications') 
+                  ? 'bg-blue-50 text-blue-600' 
+                  : 'hover:bg-gray-100 text-gray-700'
+              } ${isSidebarHidden ? 'justify-center' : ''}`}
             >
-              <link.icon className=" text-gray-600" size={20} />
-              {!isSidebarHidden && <span className="ml-3 text-gray-700">{link.label}</span>}
+              <Bell className={`${isActive('/notifications') ? 'text-blue-600' : 'text-gray-600'}`} size={20} />
+              {!isSidebarHidden && <span className="ml-3">Notificações</span>}
             </Link>
-          ))}
+
+            {/* My Profile Link */}
+            <Link
+              to={`/profile/${currentUser?.uid}`}
+              className={`flex items-center py-3 px-3 rounded-lg transition ${
+                location.pathname === `/profile/${currentUser?.uid}` 
+                  ? 'bg-blue-50 text-blue-600' 
+                  : 'hover:bg-gray-100 text-gray-700'
+              } ${isSidebarHidden ? 'justify-center' : ''}`}
+            >
+              <User className={`${location.pathname === `/profile/${currentUser?.uid}` ? 'text-blue-600' : 'text-gray-600'}`} size={20} />
+              {!isSidebarHidden && <span className="ml-3">Meu Perfil</span>}
+            </Link>
+          </div>
         </nav>
 
         <div className="p-4 flex-shrink-0">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center  py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition ${isSidebarHidden ? 'justify-center' : 'justify-center'}`}
+            className={`w-full flex items-center py-2 px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition ${isSidebarHidden ? 'justify-center' : ''}`}
           >
             <LogOut size={20} /> {!isSidebarHidden && <span className="ml-2">Sair</span>}
           </button>
@@ -151,18 +177,18 @@ const Sidebar: React.FC<SidebarProps> = ({ role, isSidebarHidden, toggleSidebar 
 export const Layout: React.FC<{
   children: ReactNode,
   role?: Role,
-  isLoading?: boolean,  // isLoading is now a prop of Layout
+  isLoading?: boolean,
   hideNavigation?: boolean;
 }> = ({ children, role = 'employee', isLoading = false, hideNavigation = false }) => {
 
   const mobileNavbarRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
-  const [isSidebarHidden, setIsSidebarHidden] = useState(true); // Initialize as true
+  const [isSidebarHidden, setIsSidebarHidden] = useState(true);
 
   // Load preference from localStorage on mount
   useEffect(() => {
     const storedPreference = localStorage.getItem('isSidebarHidden');
-    setIsSidebarHidden(storedPreference ? storedPreference === 'true' : true); // Default to true if not found
+    setIsSidebarHidden(storedPreference ? storedPreference === 'true' : true);
   }, []);
 
   // Save preference to localStorage whenever it changes
@@ -171,7 +197,7 @@ export const Layout: React.FC<{
   }, [isSidebarHidden]);
 
   const toggleSidebar = () => {
-    setIsSidebarHidden(prev => !prev); // Toggle the state
+    setIsSidebarHidden(prev => !prev);
   };
 
   const isChatRoute = location.pathname.startsWith('/admin/projects/') && location.pathname.endsWith('/chat');
@@ -179,7 +205,7 @@ export const Layout: React.FC<{
 
   return (
     <div className="flex">
-      {!hideNavigation && <Sidebar role={role} isSidebarHidden={isSidebarHidden} toggleSidebar={toggleSidebar} />} {/* Pass state and toggle */}
+      {!hideNavigation && <Sidebar role={role} isSidebarHidden={isSidebarHidden} toggleSidebar={toggleSidebar} />}
       <main
         className={`
         w-full bg-gray-50 min-h-screen
