@@ -31,7 +31,7 @@ export class ProjectService {
       
       // Convert undefined endDate to null (Firestore can store null but not undefined)
       if (cleanProjectData.endDate === undefined) {
-        cleanProjectData.endDate = null;
+        cleanProjectData.endDate = null; // Now valid with updated type definition
       }
 
       const newProject: ProjectSchema = {
@@ -202,7 +202,7 @@ async addSystemMessageToProjectChat(
       Object.keys(cleanUpdates).forEach(key => {
         if (cleanUpdates[key] === undefined) {
           if (key === 'endDate') {
-            cleanUpdates[key] = null; // Convert undefined endDate to null
+            cleanUpdates[key] = null; // Convert undefined endDate to null - now valid with updated type
           } else {
             delete cleanUpdates[key]; // Remove other undefined properties
           }
@@ -247,7 +247,7 @@ async addSystemMessageToProjectChat(
 
  // Buscar projetos com paginação e filtros
 async fetchProjects(options?: {
-  status?: ProjectSchema['status'] | '';
+  status?: ProjectSchema['status'];
   excludeStatus?: ProjectSchema['status'];
   limit?: number;
   page?: number;
@@ -257,7 +257,7 @@ async fetchProjects(options?: {
     let q = query(collection(this.db, 'projects'));
     
     // Apply status filter if provided and not empty string
-    if (options?.status && options.status !== '') {
+    if (options?.status) {
       q = query(q, where('status', '==', options.status));
     } 
     // Apply excludeStatus filter if no status filter is provided or it's empty

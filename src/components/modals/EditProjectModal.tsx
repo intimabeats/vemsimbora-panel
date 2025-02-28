@@ -149,6 +149,7 @@ export const EditProjectModal: React.FC<EditProjectModalProps> = ({
         updateData.endDate = new Date(formData.endDate).getTime()
       } else {
         // Set endDate to null if empty string
+        // This is now valid since we updated the type definition
         updateData.endDate = null;
       }
 

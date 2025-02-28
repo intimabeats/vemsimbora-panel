@@ -21,11 +21,14 @@ import { EditProjectModal } from '../../components/modals/EditProjectModal'
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal'
 import useDebounce from '../../utils/useDebounce'
 
+// Define a type for the filter status that includes empty string
+type FilterStatus = ProjectSchema['status'] | '';
+
 export const ProjectManagement: React.FC = () => {
   const [projects, setProjects] = useState<ProjectSchema[]>([])
   const [isLoading, setLoading] = useState(true)
   const [filter, setFilter] = useState<{
-    status?: ProjectSchema['status'] | ''
+    status?: FilterStatus // Updated type to include empty string
   }>({ status: '' })
   const [searchTerm, setSearchTerm] = useState('')
   const debouncedSearchTerm = useDebounce(searchTerm, 500)
@@ -241,7 +244,7 @@ export const ProjectManagement: React.FC = () => {
                 </div>
                 <select
                   value={filter.status}
-                  onChange={(e) => setFilter({ status: e.target.value })}
+                  onChange={(e) => setFilter({ status: e.target.value as FilterStatus })}
                   className="pl-10 pr-8 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 appearance-none"
                 >
                   <option value="">Todos os Status</option>

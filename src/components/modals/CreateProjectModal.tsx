@@ -7,6 +7,7 @@ import {
 import { projectService } from '../../services/ProjectService'
 import { ProjectSchema } from '../../types/firestore-schema'
 import { userManagementService } from '../../services/UserManagementService' // Corrected
+import { useAuth } from '../../context/AuthContext' // Import useAuth
 
 interface CreateProjectModalProps {
   isOpen: boolean
@@ -33,6 +34,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState(1)
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
+  const { currentUser } = useAuth(); // Get current user for createdBy field
 
   // Fetch managers
 useEffect(() => {
@@ -132,12 +134,15 @@ useEffect(() => {
         status: formData.status,
         managers: formData.managers,
         messages: [],
-        commentTabs: []
+        commentTabs: [],
+        createdBy: currentUser?.uid || '' // Add createdBy field with current user ID
       }
 
       // Only add endDate if it has a value
       if (formData.endDate) {
         projectData.endDate = new Date(formData.endDate).getTime()
+      } else {
+        projectData.endDate = null; // Set to null if empty
       }
 
       const newProject = await projectService.createProject(projectData)

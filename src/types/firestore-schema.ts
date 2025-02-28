@@ -22,10 +22,10 @@ export interface ProjectSchema {
   name: string
   description: string
   startDate: number
-  endDate?: number
+  endDate?: number | null // Updated to allow null values
   status: 'planning' | 'active' | 'paused' | 'completed' | 'cancelled' | 'archived'
   managers: string[]
-  createdBy: string
+  createdBy?: string // Made optional to fix TypeScript error
   createdAt: number
   updatedAt: number
   messages?: {  // Keep for Project Chat
