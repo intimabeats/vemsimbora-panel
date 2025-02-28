@@ -90,35 +90,87 @@ export interface TaskSchema {
 export interface TaskAction {
   id: string;
   title: string;
-  type: 'text' | 'long_text' | 'file_upload' | 'approval' | 'date' | 'document' | 'info'; // Added 'info'
+  type: 'text' | 'long_text' | 'file_upload' | 'approval' | 'date' | 'document' | 'info' | 'video_upload' | 'video_decoupage' | 'video_editing' | 'audio_processing'; // Novos tipos
   completed: boolean;
   completedAt?: number | null;
   completedBy?: string | null;
   description?: string;
-    // Specific fields for 'info' type
-    infoTitle?: string;         // Title for the info section
-    infoDescription?: string;   // Description for the info section
-    hasAttachments?: boolean;   // Flag for required attachments
-    data?: {
-        fileURLs?: string[];    // NEW: Array of file URLs for 'info' type
-        steps?: any[];          // Keep steps for document type
+  // Campos para dependências
+  dependsOn?: string[]; // IDs das ações que precisam ser concluídas antes
+  nextActions?: string[]; // IDs das ações que devem ser iniciadas após a conclusão
+  assignedTo?: string; // Usuário específico para esta ação (pode ser diferente da tarefa)
+  // Campos específicos para cada tipo
+  infoTitle?: string;
+  infoDescription?: string;
+  hasAttachments?: boolean;
+  // Campos para mídia
+  mediaSpecs?: {
+    resolution?: string;
+    format?: string;
+    duration?: number;
+    frameRate?: number;
+  };
+  // Campos para decupagem
+  decoupageInstructions?: string;
+  timeMarkers?: {
+    timestamp: number;
+    description: string;
+    importance: 'low' | 'medium' | 'high';
+  }[];
+  data?: {
+    fileURLs?: string[];
+    steps?: any[];
+    // Metadados de mídia
+    mediaMetadata?: {
+      duration?: number;
+      resolution?: string;
+      codec?: string;
+      bitrate?: number;
     };
-    attachments?: {             // Attachments specific to THIS action step
-        id: string;
-        name: string;
-        url: string;
-        type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio';
-        size?: number;
-    }[];
+  };
+  attachments?: {
+    id: string;
+    name: string;
+    url: string;
+    type: 'image' | 'video' | 'document' | 'link' | 'other' | 'audio';
+    size?: number;
+    // Metadados específicos para vídeo
+    videoMetadata?: {
+      duration?: number;
+      resolution?: string;
+      frameRate?: number;
+    };
+  }[];
+  // Status de aprovação
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvalFeedback?: string;
+  // Campos para controle de fluxo
+  isBlocking?: boolean; // Se true, bloqueia o progresso até ser concluída
+  priority?: 'low' | 'medium' | 'high';
+  estimatedTime?: number; // Tempo estimado em minutos
 }
 
 //NEW: Interface for a task action template
 export interface ActionTemplateSchema {
-    id: string;
-    title: string;
-    type: 'custom'; // Assuming a single type for now
-    elements: TaskAction[]; // Now includes description and fileURLs
-    order: number;
+  id: string;
+  title: string;
+  type: 'custom' | 'video_production' | 'content_creation' | 'design' | 'development'; // Tipos específicos de fluxos
+  elements: TaskAction[];
+  // Novo campo para definir o fluxo de trabalho
+  workflow?: {
+    steps: {
+      stepId: string;
+      actions: string[]; // IDs das ações neste passo
+      dependsOn?: string[]; // IDs dos passos que precisam ser concluídos antes
+    }[];
+  };
+  order: number;
+  // Metadados adicionais
+  category?: string;
+  tags?: string[];
+  createdBy?: string;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
     // Reward Schema
