@@ -5,18 +5,6 @@ import { actionTemplateService } from '../../services/ActionTemplateService'
 import { ActionTemplateSchema, TaskAction } from '../../types/firestore-schema'
 import { PlusCircle, Save, XCircle, Plus, Trash2, ChevronLeft, ChevronRight, File, FileText, Type, List, Settings, ArrowUp, ArrowDown, FileEdit, Info } from 'lucide-react' // Added Info icon
 import { DeleteConfirmationModal } from '../../components/modals/DeleteConfirmationModal';
-
-// TipTap Imports - Keep, but don't use the editor *here*
-import { useEditor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import LinkExtension from '@tiptap/extension-link';
-import ImageExtension from '@tiptap/extension-image';
-import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
-import TextStyle from '@tiptap/extension-text-style'
-import { Color } from '@tiptap/extension-color'
-import TextAlign from '@tiptap/extension-text-align'
-import { EditorToolbar } from '../../components/ActionView'; // Keep the import
 import { deepCopy } from '../../utils/helpers'; // Import deepCopy
 
 const getActionIcon = (type: TaskAction['type']) => {
@@ -29,8 +17,6 @@ const getActionIcon = (type: TaskAction['type']) => {
       return <File size={16} />;
     case 'date':
       return <List size={16} />;
-    case 'document':
-      return <FileEdit size={16} />;
     case 'info': // Added case for 'info'
       return <Info size={16} />;
     default:
@@ -152,94 +138,70 @@ export const CreateActionTemplate: React.FC = () => {
   const [templates, setTemplates] = useState<ActionTemplateSchema[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
-    const [saveOption, setSaveOption] = useState<'replace' | 'new' | null>(null); // 'replace', 'new', or null
-    const [existingTemplateId, setExistingTemplateId] = useState<string | null>(null); // To store the ID for replacement
+  const [saveOption, setSaveOption] = useState<'replace' | 'new' | null>(null); // 'replace', 'new', or null
+  const [existingTemplateId, setExistingTemplateId] = useState<string | null>(null); // To store the ID for replacement
 
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const fetchedTemplates = await actionTemplateService.fetchActionTemplates();
+      setTemplates(fetchedTemplates);
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+      setError("Failed to load templates.");
+    }
+  }, []);
 
-  // TipTap Editor (Keep the instance, but don't use it directly in the render)
-  const editor = useEditor({
-    extensions: [
-      StarterKit,
-      LinkExtension,
-      ImageExtension,
-      Placeholder.configure({
-        placeholder: 'Digite o conteúdo aqui...',
-      }),
-      Underline,
-      TextStyle,
-      Color,
-        TextAlign.configure({
-            types: ['heading', 'paragraph'],
-        }),
-    ],
-    content: '',
-    editable: true, // Keep it editable, even if we don't render it
-    onUpdate: ({ editor }) => {
-      // We no longer update the 'data' field *here*.  It's only for runtime.
-    },
-  });
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
 
-    const fetchTemplates = useCallback(async () => {
-        try {
-            const fetchedTemplates = await actionTemplateService.fetchActionTemplates();
-            setTemplates(fetchedTemplates);
-        } catch (error) {
-            console.error("Error fetching templates:", error);
-            setError("Failed to load templates.");
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchTemplates();
-    }, [fetchTemplates]);
-
-    useEffect(() => {
+  useEffect(() => {
     const loadTemplate = async () => {
-        if (selectedTemplate) {
-            try {
-                const templateData = await actionTemplateService.getActionTemplateById(selectedTemplate);
-                if (templateData) {
-                    setTitle(templateData.title);
-                    setExistingTemplateId(templateData.id); // Store the existing ID
+      if (selectedTemplate) {
+        try {
+          const templateData = await actionTemplateService.getActionTemplateById(selectedTemplate);
+          if (templateData) {
+            setTitle(templateData.title);
+            setExistingTemplateId(templateData.id); // Store the existing ID
 
-                    const newElementsByStep: { [step: number]: TaskAction[] } = {};
-                    let currentStep = 1;
-                    let currentStepElements: TaskAction[] = [];
+            const newElementsByStep: { [step: number]: TaskAction[] } = {};
+            let currentStep = 1;
+            let currentStepElements: TaskAction[] = [];
 
-                    // Iterate through the elements and group them by step
-                    for (const element of templateData.elements) {
-                        currentStepElements.push(element);
-                        if (element.type === 'document' || element.type === 'approval') { // Assuming 'document' marks end of step
-                            newElementsByStep[currentStep] = currentStepElements;
-                            currentStep++;
-                            currentStepElements = []; // Reset for the next step
-                        }
-                    }
-                    // Add any remaining elements to the last step
-                    if (currentStepElements.length > 0) {
-                        newElementsByStep[currentStep] = currentStepElements;
-                    }
-
-                    setElementsByStep(newElementsByStep);
-                    setNumSteps(Object.keys(newElementsByStep).length);
-                    setCurrentStep(1);
-                }
-            } catch (error) {
-                console.error("Error loading template:", error);
-                setError("Failed to load the selected template.");
+            // Iterate through the elements and group them by step
+            for (const element of templateData.elements) {
+              currentStepElements.push(element);
+              if (element.type === 'approval') { // Only approval marks end of step now
+                newElementsByStep[currentStep] = currentStepElements;
+                currentStep++;
+                currentStepElements = []; // Reset for the next step
+              }
             }
-        } else {
-            // Reset if no template is selected
-            setTitle('');
-            setElementsByStep({});
-            setNumSteps(1);
+            // Add any remaining elements to the last step
+            if (currentStepElements.length > 0) {
+              newElementsByStep[currentStep] = currentStepElements;
+            }
+
+            setElementsByStep(newElementsByStep);
+            setNumSteps(Object.keys(newElementsByStep).length);
             setCurrentStep(1);
-            setExistingTemplateId(null);
+          }
+        } catch (error) {
+          console.error("Error loading template:", error);
+          setError("Failed to load the selected template.");
         }
+      } else {
+        // Reset if no template is selected
+        setTitle('');
+        setElementsByStep({});
+        setNumSteps(1);
+        setCurrentStep(1);
+        setExistingTemplateId(null);
+      }
     };
 
     loadTemplate();
-}, [selectedTemplate, editor]); // Keep editor in dependencies
+  }, [selectedTemplate]);
 
 
   const handleAddElement = (type: TaskAction['type']) => {
@@ -305,95 +267,95 @@ export const CreateActionTemplate: React.FC = () => {
     setNumSteps(isNaN(value) || value < 1 ? 1 : value);
   };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError(null);
-        setSuccess(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccess(false);
 
-        try {
-            const allElements: TaskAction[] = [];
-            for (let i = 1; i <= numSteps; i++) {
-                if (elementsByStep[i]) {
-                    // Filter out data and other unnecessary fields, handling 'info' type
-                    const stepElements = elementsByStep[i].map(element => {
-                        // Add the completed property to make TypeScript happy
-                        const completeElement = {
-                            ...element,
-                            completed: false
-                        };
-                        
-                        if (element.type === 'info') {
-                            const { completed, completedAt, completedBy, attachments, ...infoElement } = completeElement;
-                            return { ...infoElement, completed: false };
-                        }
-                        
-                        const { data, ...rest } = completeElement;
-                        return data === undefined ? rest : completeElement;
-                    });
-                    allElements.push(...stepElements);
-                }
-            }
-
-            const newTemplate: Omit<ActionTemplateSchema, 'id'> = {
-                title,
-                type: 'custom',  // Assuming a 'custom' type for user-created templates
-                elements: allElements,
-                order: Date.now()
+    try {
+      const allElements: TaskAction[] = [];
+      for (let i = 1; i <= numSteps; i++) {
+        if (elementsByStep[i]) {
+          // Filter out data and other unnecessary fields, handling 'info' type
+          const stepElements = elementsByStep[i].map(element => {
+            // Add the completed property to make TypeScript happy
+            const completeElement = {
+              ...element,
+              completed: false
             };
-
-            // Check if replacing or creating new
-            if (saveOption === 'replace' && existingTemplateId) {
-                await actionTemplateService.updateActionTemplate(existingTemplateId, newTemplate);
-                setSuccess(true);
-            } else {
-                // Check for title uniqueness if creating new
-                const existingTemplates = await actionTemplateService.fetchActionTemplates();
-                if (existingTemplates.some(t => t.title === title)) {
-                    setError("Já existe um modelo com este título. Por favor, escolha um título diferente.");
-                    setIsLoading(false);
-                    return; // Stop the process
-                }
-
-                await actionTemplateService.createActionTemplate(newTemplate);
-                setSuccess(true);
-                // Reset form only on successful *creation*
-                setTitle('');
-                setElementsByStep({});
-                setNumSteps(1);
-                setCurrentStep(1);
-                setSelectedTemplate('');
+            
+            if (element.type === 'info') {
+              const { completed, completedAt, completedBy, attachments, ...infoElement } = completeElement;
+              return { ...infoElement, completed: false };
             }
-
-            await fetchTemplates(); // Refresh templates list in all cases
-
-        } catch (err: any) {
-            setError(err.message || 'Falha ao criar modelo de ação');
-        } finally {
-            setIsLoading(false);
-            setSaveOption(null); // Reset save option
+            
+            const { data, ...rest } = completeElement;
+            return data === undefined ? rest : completeElement;
+          });
+          allElements.push(...stepElements);
         }
-    };
+      }
 
-    const handleDeleteTemplate = async (templateId: string) => {
-        try {
-            await actionTemplateService.deleteActionTemplate(templateId);
-            await fetchTemplates();
-        } catch (error) {
-            console.error("Error deleting template:", error);
-            setError("Failed to delete the template.");
-        }
-    };
+      const newTemplate: Omit<ActionTemplateSchema, 'id'> = {
+        title,
+        type: 'custom',  // Assuming a 'custom' type for user-created templates
+        elements: allElements,
+        order: Date.now()
+      };
 
-    const handleReorderTemplates = async (newTemplatesOrder: ActionTemplateSchema[]) => {
-        try {
-            setTemplates(newTemplatesOrder);
-            await actionTemplateService.updateTemplateOrder(newTemplatesOrder);
-        } catch (error) {
-            console.error("Error reordering templates:", error);
-            setError("Failed to reorder templates.");
+      // Check if replacing or creating new
+      if (saveOption === 'replace' && existingTemplateId) {
+        await actionTemplateService.updateActionTemplate(existingTemplateId, newTemplate);
+        setSuccess(true);
+      } else {
+        // Check for title uniqueness if creating new
+        const existingTemplates = await actionTemplateService.fetchActionTemplates();
+        if (existingTemplates.some(t => t.title === title)) {
+          setError("Já existe um modelo com este título. Por favor, escolha um título diferente.");
+          setIsLoading(false);
+          return; // Stop the process
         }
-    };
+
+        await actionTemplateService.createActionTemplate(newTemplate);
+        setSuccess(true);
+        // Reset form only on successful *creation*
+        setTitle('');
+        setElementsByStep({});
+        setNumSteps(1);
+        setCurrentStep(1);
+        setSelectedTemplate('');
+      }
+
+      await fetchTemplates(); // Refresh templates list in all cases
+
+    } catch (err: any) {
+      setError(err.message || 'Falha ao criar modelo de ação');
+    } finally {
+      setIsLoading(false);
+      setSaveOption(null); // Reset save option
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      await actionTemplateService.deleteActionTemplate(templateId);
+      await fetchTemplates();
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      setError("Failed to delete the template.");
+    }
+  };
+
+  const handleReorderTemplates = async (newTemplatesOrder: ActionTemplateSchema[]) => {
+    try {
+      setTemplates(newTemplatesOrder);
+      await actionTemplateService.updateTemplateOrder(newTemplatesOrder);
+    } catch (error) {
+      console.error("Error reordering templates:", error);
+      setError("Failed to reorder templates.");
+    }
+  };
 
   useEffect(() => {
     setElementsByStep(prev => {
@@ -417,18 +379,18 @@ export const CreateActionTemplate: React.FC = () => {
     }
   }, [numSteps]);
 
-    const isFormValid = () => {
-        if (!title.trim()) return false;
-        for (let i = 1; i <= numSteps; i++) {
-            const stepElements = elementsByStep[i] || [];
-            for (const element of stepElements) {
-                if (!element.title.trim() || !element.description?.trim()) {
-                    return false;
-                }
-            }
+  const isFormValid = () => {
+    if (!title.trim()) return false;
+    for (let i = 1; i <= numSteps; i++) {
+      const stepElements = elementsByStep[i] || [];
+      for (const element of stepElements) {
+        if (!element.title.trim() || !element.description?.trim()) {
+          return false;
         }
-        return true;
-    };
+      }
+    }
+    return true;
+  };
 
   return (
     <Layout role="admin">
@@ -517,7 +479,6 @@ export const CreateActionTemplate: React.FC = () => {
                         {getActionIcon(element.type)}
                     </span>
 
-                    {/* NO EDITOR HERE */}
                     <div className="flex-1 mr-2 space-y-2">
                         <input
                             type="text"
@@ -607,20 +568,12 @@ export const CreateActionTemplate: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleAddElement('document')}
+                onClick={() => handleAddElement('info')}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                title="Adicionar editor de documento"
+                title="Adicionar Informações Importantes"
               >
-                <Plus className="mr-1" size={16} /> Documento
+                <Plus className="mr-1" size={16} /> Informações
               </button>
-                <button
-                    type="button"
-                    onClick={() => handleAddElement('info')}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                    title="Adicionar Informações Importantes"
-                >
-                    <Plus className="mr-1" size={16} /> Informações
-                </button>
             </div>
           </div>
 
